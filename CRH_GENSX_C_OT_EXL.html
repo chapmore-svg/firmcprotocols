@@ -266,16 +266,16 @@ function parseEntry(text, est){
 
   // anaesthesia / category
   let ana="";
-  if(/local\s*\+\s*sed|la\s*\/\s*sed/i.test(t)) ana="LA/Sed";
-  else if(/sedation/i.test(t)&&/local/i.test(t)) ana="LA/Sed";
-  else if(/\bGA\b|general/i.test(t)) ana="GA";
-  else if(/local|\\bLA\\b/i.test(t)) ana="LA";
+  if(/local\s*\+\s*sed|\bla\s*\/\s*sed/i.test(t)) ana="LA/Sed";
+  else if(/sedation/i.test(t)&&/\blocal\b/i.test(t)) ana="LA/Sed";
+  else if(/\bGA\b|general\s+an(a)?esth/i.test(t)) ana="GA";   // "general" alone (e.g. "General Surgery") is not GA
+  else if(/\blocal\b|\bLA\b/i.test(t)) ana="LA";
 
   // procedure segment: before "Reg"
   let proc=t;
   const cut=t.search(/reg\.?\s*#?/i);
   if(cut>-1) proc=t.slice(0,cut);
-  proc=proc.replace(/^\W+|\W+$/g,"").replace(/\s+/g," ").trim();
+  proc=stripAna(proc).replace(/^\W+|\W+$/g,"").replace(/\s+/g," ").trim();
 
   const d=deriveDxProc(proc);
   if(!ana){ ana=d.anaDefault||""; if(ana) flags.ana=true; }
@@ -284,10 +284,19 @@ function parseEntry(text, est){
   return {name, doc, age, ward:"DC", est:est||"", dx:d.dx, proc:d.proc, ana, status:"PUBLIC", flags};
 }
 
+// Remove anaesthesia words from the procedure text: the anaesthesia has its own
+// column and is appended to the procedure on export, so leaving it in duplicates it.
+function stripAna(s){
+  return s
+    .replace(/\b(?:under\s+)?(?:la\s*\/\s*sed(?:ation)?|local\s*\+\s*sed(?:ation)?|local(?:\s+an(?:a)?esthe(?:sia|tic))?(?:\s+(?:with|and|\+)\s+sedation)?|general\s+an(?:a)?esthe(?:sia|tic))\b/gi," ")
+    .replace(/\b(?:under\s+)?(?:GA|LA)\b/gi," ")
+    .replace(/\s+/g," ").trim();
+}
+
 function deriveDxProc(p){
   const L=p.toLowerCase();
   if(/ex\s*\.?\s*bx|excis/i.test(L)){
-    let rest=p.replace(/ex\s*\.?\s*bx\./i,"").replace(/excisional?\s*(biopsy)?/i,"").replace(/^[\s.,]+/,"").replace(/^\?\s*/,"?").trim();
+    let rest=p.replace(/ex\s*\.?\s*bx\.?/i,"").replace(/excisional?\s*(biopsy)?/i,"").replace(/^[\s.,]+/,"").replace(/^\?\s*/,"?").trim();
     if(!rest) rest=p;
     return {dx:rest.charAt(0).toUpperCase()+rest.slice(1), proc:"Excisional Biopsy", anaDefault:"LA", inferred:true};
   }
