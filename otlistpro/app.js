@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.6.1";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -152,6 +152,9 @@ function renderUpload(){
   sel.innerHTML = siteList().map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
   if(cur && [...sel.options].some(o=>o.value===cur)) sel.value = cur;
   if(!$("session").value) $("session").value = settings.session;
+  $("pick-help").innerHTML = IS_ANDROID
+    ? "Tap the box, then choose the folder where the file is saved. Tap <b>☰</b> (top left) to see <b>Downloads</b>, <b>Drive</b> and your other folders."
+    : "Click the box, then browse to the folder where the file is saved: Downloads, Documents, OneDrive, a USB stick or anywhere else.";
   setMode(inputMode);
 }
 const drop = $("drop"), fileInput = $("file");

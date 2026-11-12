@@ -1,6 +1,6 @@
 /* OT List Pro service worker: keeps the app working offline.
    Bump CACHE whenever any app file changes, so installed copies pick up the new version. */
-const CACHE = "otlp-1.6.0";
+const CACHE = "otlp-1.6.1";
 const FILES = [
   "./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest",
   "./vendor/pdf.min.js", "./vendor/pdf.worker.min.js",
