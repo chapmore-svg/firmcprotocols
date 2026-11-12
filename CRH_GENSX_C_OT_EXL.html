@@ -139,7 +139,6 @@ footer{color:var(--grey); font-size:.72rem; text-align:center; margin-top:26px;}
         <thead>
           <tr>
             <th style="width:86px">ORDER</th>
-            <th style="width:92px" title="Estimated time of surgery: booked start time from the calendar">ETS</th>
             <th style="width:84px" title="Expected surgical time: calendar slot length in minutes">EST (MIN)</th>
             <th>NAME</th><th style="width:90px">DOC #/DOB</th>
             <th style="width:64px">AGE</th><th style="width:64px">WARD</th>
@@ -255,20 +254,17 @@ function parseSource(){
     const e24=to24(mt[5], mt[7]), em=+(mt[6]||0);
     let dur=(e24*60+em)-(h24*60+mm);   // booked slot length in minutes
     if(dur<=0) dur+=1440;              // slot running past midnight
-    found.push({t:h24*60+mm, est:String(dur), ets:fmtClock(h24,mm), text:chunk});
+    found.push({t:h24*60+mm, est:String(dur), text:chunk});
   }
   found.sort((a,b)=>a.t-b.t);
 
-  cases=found.map(f=>Object.assign(parseEntry(f.text, f.est), {ets:f.ets}));
+  cases=found.map(f=>parseEntry(f.text, f.est));
   if(!cases.length){ m.className="msg err"; m.textContent="No patient entries recognised — check the pasted text contains the case lines (name, age/sex, Reg #)."; return; }
   m.className="msg"; m.textContent=cases.length+" case"+(cases.length>1?"s":"")+", in theatre order. Review below.";
   render();
   $("reviewsec").style.display=$("exportsec").style.display="block";
   updateFname();
 }
-
-// 24h hour + minutes -> "8:00 AM"
-function fmtClock(h,m){ const ap=h<12?"AM":"PM"; const h12=h%12||12; return h12+":"+String(m).padStart(2,"0")+" "+ap; }
 
 function parseEntry(text, est){
   const flags={};
@@ -347,7 +343,7 @@ function render(){
         <button class="mini" data-a="up" data-i="${i}" title="Move up">↑</button>
         <button class="mini" data-a="dn" data-i="${i}" title="Move down">↓</button>
         <button class="mini del" data-a="del" data-i="${i}" title="Remove">✕</button></td>`+
-      cell(i,"ets",c)+cell(i,"est",c)+
+      cell(i,"est",c)+
       cell(i,"name",c)+cell(i,"doc",c)+cell(i,"age",c)+cell(i,"ward",c)+cell(i,"dx",c)+cell(i,"proc",c)+
       `<td><select data-f="ana" data-i="${i}">
           ${["","LA","GA","LA/Sed"].map(o=>`<option value="${o}" ${c.ana===o?"selected":""}>${o||"—"}</option>`).join("")}
@@ -412,7 +408,7 @@ document.addEventListener("click", e=>{
   if(a==="st"){ cases[i].status=e.target.dataset.v; render(); }
 });
 $("addrow").addEventListener("click", ()=>{
-  cases.push({ets:"",name:"",doc:"",age:"",ward:"DC",est:"",dx:"",proc:"",ana:"",status:"PUBLIC",flags:{}});
+  cases.push({name:"",doc:"",age:"",ward:"DC",est:"",dx:"",proc:"",ana:"",status:"PUBLIC",flags:{}});
   render();
 });
 $("parsebtn").addEventListener("click", parseSource);
@@ -444,34 +440,34 @@ function buildSheetXml(site, b){
     : `<c r="${col}${r}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(val)}</t></is></c>`;
 
   rows.push(`<row r="3" ht="23.25" customHeight="1">${c("A",3,1,"SURGERIES TO BE DONE  @ "+site+" SITE")}</row>`);
-  rows.push(`<row r="4" ht="23.25" customHeight="1">${c("A",4,2,"SURGEONS: "+surgeonsText())}${c("K",4,2,"DATE: "+b.day+", "+b.month+" "+b.dnum+", "+b.year)}</row>`);
+  rows.push(`<row r="4" ht="23.25" customHeight="1">${c("A",4,2,"SURGEONS: "+surgeonsText())}${c("J",4,2,"DATE: "+b.day+", "+b.month+" "+b.dnum+", "+b.year)}</row>`);
 
-  const h5={A:"ETS",B:"NAME",C:"DOC #/DOB",D:"AGE",E:"WARD",F:"DIAGNOSIS",G:"SURGICAL PROCEDURE",H:"STATUS",J:"OUTCOME ",L:"PROCEDURE TIMES",O:"REASON FOR CANCELLATION",P:"NAME OF  PRIMARY ATTENDING SURGEON /ANAESTHEIST "};
+  const h5={A:"NAME",B:"DOC #/DOB",C:"AGE",D:"WARD",E:"DIAGNOSIS",F:"SURGICAL PROCEDURE",G:"STATUS",I:"OUTCOME ",K:"PROCEDURE TIMES",N:"REASON FOR CANCELLATION",O:"NAME OF  PRIMARY ATTENDING SURGEON /ANAESTHEIST "};
   let r5="";
-  for(let i=1;i<=16;i++){ const col=colName(i); r5+=c(col,5,3,h5[col]); }
+  for(let i=1;i<=15;i++){ const col=colName(i); r5+=c(col,5,3,h5[col]); }
   rows.push(`<row r="5" ht="116.25" customHeight="1">${r5}</row>`);
 
-  const h6={H:"PRIVATE ",I:"PUBLIC",J:"COMPLETED",K:"CANCELLED",L:"EST (MIN)",M:"START ",N:"END"};
+  const h6={G:"PRIVATE ",H:"PUBLIC",I:"COMPLETED",J:"CANCELLED",K:"EST (MIN)",L:"START ",M:"END"};
   let r6="";
-  for(let i=1;i<=16;i++){ const col=colName(i); r6+=c(col,6,4,h6[col]); }
+  for(let i=1;i<=15;i++){ const col=colName(i); r6+=c(col,6,4,h6[col]); }
   rows.push(`<row r="6" ht="33" customHeight="1">${r6}</row>`);
 
   cases.forEach((cs,idx)=>{
     const r=7+idx;
     const proc=cs.proc+(cs.ana?` (${cs.ana})`:"");
-    const vals={A:cs.ets,B:cs.name,C:cs.doc,D:cs.age,E:cs.ward,F:cs.dx,G:proc,
-                H:cs.status==="PRIVATE"?TICK:"",I:cs.status==="PUBLIC"?TICK:"",L:cs.est,M:"",N:""};
+    const vals={A:cs.name,B:cs.doc,C:cs.age,D:cs.ward,E:cs.dx,F:proc,
+                G:cs.status==="PRIVATE"?TICK:"",H:cs.status==="PUBLIC"?TICK:"",K:cs.est,L:"",M:""};
     let rw="";
-    for(let i=1;i<=16;i++){ const col=colName(i); rw+=c(col,r,3,vals[col]); }
+    for(let i=1;i<=15;i++){ const col=colName(i); rw+=c(col,r,3,vals[col]); }
     rows.push(`<row r="${r}" ht="56.25" customHeight="1">${rw}</row>`);
   });
 
   const sig=7+cases.length+1;
   const sigs=[
-    [sig,  "F","DEPARTMENTAL SISTER/DESIGNATE_______________________","K","ANESTHESIST_____________________________"],
-    [sig+2,"F","CONSULTANT SURGEON_______________________________","K","S.M.O. SIGNATURE  (PRE)____________________"],
-    [sig+4,"F","DEPARTMENTAL SISTER/DESIGNATE_______________________","K","S.M.O. SIGNATURE (POST)___________________"],
-    [sig+6,null,null,"K","ANAESTHESIST __________________________"],
+    [sig,  "E","DEPARTMENTAL SISTER/DESIGNATE_______________________","J","ANESTHESIST_____________________________"],
+    [sig+2,"E","CONSULTANT SURGEON_______________________________","J","S.M.O. SIGNATURE  (PRE)____________________"],
+    [sig+4,"E","DEPARTMENTAL SISTER/DESIGNATE_______________________","J","S.M.O. SIGNATURE (POST)___________________"],
+    [sig+6,null,null,"J","ANAESTHESIST __________________________"],
   ];
   sigs.forEach(([r,c1,t1,c2,t2])=>{
     let rw=""; if(c1) rw+=c(c1,r,5,t1); rw+=c(c2,r,5,t2);
@@ -479,14 +475,14 @@ function buildSheetXml(site, b){
   });
 
   const lastRow=sig+6;
-  const widths={A:11,B:26,C:13.8,D:8.4,E:11.2,F:23,G:30.2,H:11,I:11,J:15.4,K:14.4,L:10,M:10,N:10,O:22,P:25.7};
+  const widths={A:26,B:13.8,C:8.4,D:11.2,E:23,F:30.2,G:11,H:11,I:15.4,J:14.4,K:10,L:10,M:10,N:22,O:25.7};
   const cols=Object.keys(widths).map((k,i)=>`<col min="${i+1}" max="${i+1}" width="${widths[k]}" customWidth="1"/>`).join("");
-  const merges=["H5:I5","J5:K5","L5:N5","O5:O6","A5:A6","B5:B6","C5:C6","D5:D6","E5:E6","F5:F6","G5:G6","P5:P6"];
+  const merges=["G5:H5","I5:J5","K5:M5","N5:N6","A5:A6","B5:B6","C5:C6","D5:D6","E5:E6","F5:F6","O5:O6"];
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
-<dimension ref="A1:P${lastRow}"/>
+<dimension ref="A1:O${lastRow}"/>
 <sheetViews><sheetView workbookViewId="0"/></sheetViews>
 <sheetFormatPr defaultRowHeight="15"/>
 <cols>${cols}</cols>
@@ -602,13 +598,13 @@ function buildListHTML(b, site){
   <div style="font-weight:800; font-size:12pt; margin-top:8px;">SURGERIES TO BE DONE  @ ${site} SITE</div>
   <div class="pv-line"><span>SURGEONS: ${xmlEsc(surgeonsText())}</span><span>DATE: ${b.day}, ${b.month} ${b.dnum}, ${b.year}</span></div>
   <table>
-    <tr><th rowspan="2">ETS</th><th rowspan="2">NAME</th><th rowspan="2">DOC #/DOB</th><th rowspan="2">AGE</th><th rowspan="2">WARD</th>
+    <tr><th rowspan="2">NAME</th><th rowspan="2">DOC #/DOB</th><th rowspan="2">AGE</th><th rowspan="2">WARD</th>
         <th rowspan="2">DIAGNOSIS</th><th rowspan="2">SURGICAL PROCEDURE</th>
         <th colspan="2">STATUS</th><th colspan="2">OUTCOME</th><th colspan="3">PROCEDURE TIMES</th>
         <th rowspan="2">REASON FOR CANCELLATION</th><th rowspan="2">NAME OF PRIMARY ATTENDING SURGEON /ANAESTHEIST</th></tr>
     <tr><th>PRIVATE</th><th>PUBLIC</th><th>COMPLETED</th><th>CANCELLED</th><th>EST (MIN)</th><th>START</th><th>END</th></tr>
     ${cases.map(cs=>`<tr>
-      <td>${xmlEsc(cs.ets||"")}</td><td>${xmlEsc(cs.name)}</td><td>${xmlEsc(cs.doc)}</td><td>${xmlEsc(cs.age)}</td><td>${xmlEsc(cs.ward)}</td>
+      <td>${xmlEsc(cs.name)}</td><td>${xmlEsc(cs.doc)}</td><td>${xmlEsc(cs.age)}</td><td>${xmlEsc(cs.ward)}</td>
       <td>${xmlEsc(cs.dx)}</td><td>${xmlEsc(cs.proc)}${cs.ana?" ("+cs.ana+")":""}</td>
       <td>${cs.status==="PRIVATE"?TICK:""}</td><td>${cs.status==="PUBLIC"?TICK:""}</td>
       <td></td><td></td><td>${xmlEsc(cs.est)}</td><td></td><td></td><td></td><td></td></tr>`).join("")}
