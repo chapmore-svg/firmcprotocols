@@ -285,3 +285,4 @@ textarea{width:100%; min-height:120px; margin-top:8px; padding:12px; border:1.5p
   color:var(--muted); font-weight:600; font-size:.9rem;}
 .settings-link:hover{background:var(--surface); color:var(--ink);}
 @media (max-width:620px){ .modes{gap:8px;} .mode{padding:12px 4px 10px;} }
+.email-help{margin-top:10px; padding:10px 12px; border-radius:10px; background:var(--teal-soft); color:var(--ink); font-size:.86rem; line-height:1.45;}

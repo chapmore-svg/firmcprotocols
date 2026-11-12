@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -510,7 +510,9 @@ function renderExport(){
   $("fname").textContent = fileName();
   $("preview").innerHTML = b ? buildListHTML(b) : '<p style="padding:20px">Set the list date on the Upload step first.</p>';
   requestAnimationFrame(fitPreview);
-  $("sharebtn").hidden = !(navigator.canShare && navigator.canShare({files:[new File([""],"x.xlsx",{type:XLSX_MIME})]}));
+  $("email-help").innerHTML = canShareFiles()
+    ? "<b>Email the list</b> opens a menu of your apps. Choose <b>Gmail</b> or <b>Outlook</b>: it opens with the Excel file attached and the subject and message filled in. Choose who it goes to, then tap Send."
+    : "<b>Email the list</b> downloads the Excel file and opens your email program with the subject and message filled in. <b>Attach the downloaded file</b>, choose who it goes to, then send.";
 }
 // shrink the full-width hospital list so the whole page is visible in the preview
 function fitPreview(){
@@ -686,10 +688,34 @@ $("xlsxbtn").addEventListener("click", ()=>{
   setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
   toast("Excel file downloaded");
 });
-$("sharebtn").addEventListener("click", async ()=>{
+/* ---- email: hand the Excel file to the device's own email app ---- */
+function canShareFiles(){
+  try{ return !!(navigator.canShare && navigator.canShare({files:[new File([""],"x.xlsx",{type:XLSX_MIME})]})); }catch(e){ return false; }
+}
+function emailSubject(){
+  const b = dateBits();
+  return `OT List – ${$("site").value} – ${b ? `${b.day.charAt(0)+b.day.slice(1).toLowerCase()} ${b.dnum} ${b.monthTitle} ${b.year}` : ""}`;
+}
+function emailBody(){
+  const b = dateBits();
+  const total = cases.reduce((s,c)=>s+(parseInt(c.est,10)||0),0);
+  return `Good day,\n\nPlease find attached the operating theatre list for ${$("site").value}, ${b ? b.pretty : ""} `+
+         `(${cases.length} case${cases.length===1?"":"s"}, ${fmtHM(total)}).\n\nRegards,\n${settings.user || ""}`.trimEnd();
+}
+$("emailbtn").addEventListener("click", async ()=>{
   const blob = buildXlsx(); if(!blob) return;
   const file = new File([blob], fileName(), {type:XLSX_MIME});
-  try{ await navigator.share({files:[file], title:fileName()}); }catch(e){ if(e.name!=="AbortError") toast("Sharing isn't available here. Use Download instead."); }
+  if(canShareFiles()){
+    try{ await navigator.share({files:[file], title:emailSubject(), text:emailBody()}); return; }
+    catch(e){ if(e.name==="AbortError") return; }
+  }
+  // No share menu on this device: download the file, then open a new email with subject and message filled in.
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = fileName();
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  setTimeout(()=>{ location.href = `mailto:?subject=${encodeURIComponent(emailSubject())}&body=${encodeURIComponent(emailBody())}`; }, 400);
+  toast("Excel downloaded. Attach it to the email that opens.", null, null, 6000);
 });
 $("newlist").addEventListener("click", ()=>{
   cases = []; sourceText = ""; $("pastebox").value = ""; $("listdate").value = ""; $("session").value = settings.session;
