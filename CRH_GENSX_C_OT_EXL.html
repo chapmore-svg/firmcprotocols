@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRH GENSX C OT EXL</title>
+<style>
+:root{
+  --sky:#0096C7; --dark:#003554; --light:#E8F4F8; --grey:#64748B;
+  --amber:#B7791F; --amber-bg:#FDF3DF; --line:#BFDCE8; --white:#FFFFFF;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{font-family:"Segoe UI",Roboto,system-ui,sans-serif; color:var(--dark); background:#F6FAFC;}
+header{background:var(--sky); color:#fff; padding:18px 22px; display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap;}
+.hdr-full{background:transparent; color:#fff; border:1.5px solid rgba(255,255,255,.55); width:32px; height:32px; border-radius:6px; font-size:1rem; line-height:1; padding:0; flex:none;}
+.hdr-full:hover{background:rgba(255,255,255,.15);}
+header h1{font-size:1.25rem; letter-spacing:.06em;}
+header p{font-size:.8rem; opacity:.9; margin-top:3px;}
+main{max-width:1180px; margin:0 auto; padding:18px 16px 60px;}
+section{background:var(--white); border:1px solid var(--line); border-radius:10px; margin-top:16px; overflow:hidden;}
+.sec-title{background:var(--light); padding:9px 14px; font-weight:700; font-size:.82rem; letter-spacing:.08em; color:var(--dark); border-bottom:1px solid var(--line);}
+.sec-body{padding:14px;}
+.rowflex{display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;}
+label.fld{display:flex; flex-direction:column; gap:4px; font-size:.72rem; font-weight:600; color:var(--grey); letter-spacing:.05em;}
+input[type=date], select, input[type=text]{border:1px solid var(--line); border-radius:6px; padding:7px 9px; font-size:.9rem; color:var(--dark); background:#fff; font-family:inherit;}
+input:focus, select:focus, textarea:focus, button:focus-visible{outline:2px solid var(--sky); outline-offset:1px;}
+.drop{border:2px dashed var(--sky); border-radius:8px; background:var(--light); padding:22px; text-align:center; cursor:pointer; transition:background .15s;}
+.drop.drag{background:#D2ECF5;}
+.drop b{color:var(--sky);}
+.drop small{display:block; color:var(--grey); margin-top:4px;}
+textarea{width:100%; min-height:110px; border:1px solid var(--line); border-radius:8px; padding:10px; font-size:.85rem; font-family:ui-monospace,Consolas,monospace; margin-top:10px; color:var(--dark);}
+button{font-family:inherit; cursor:pointer; border:none; border-radius:7px; font-weight:700; letter-spacing:.03em;}
+.btn{background:var(--sky); color:#fff; padding:10px 18px; font-size:.9rem;}
+.btn:hover{background:#0084B0;}
+.btn.ghost{background:#fff; color:var(--sky); border:1.5px solid var(--sky);}
+.btn.ghost:hover{background:var(--light);}
+.btn:disabled{background:#A9C9D6; cursor:not-allowed;}
+.msg{font-size:.82rem; margin-top:8px; color:var(--grey);}
+.msg.err{color:#B4232A;}
+/* government-style review table */
+.gov-wrap{overflow-x:auto;}
+table.gov{border-collapse:collapse; width:100%; min-width:960px; font-family:"Arial Narrow",Arial,sans-serif;}
+table.gov th{background:var(--dark); color:#fff; font-size:.68rem; letter-spacing:.06em; padding:7px 6px; border:1px solid var(--dark);}
+table.gov td{border:1px solid var(--line); padding:4px; vertical-align:middle; text-align:center;}
+table.gov tr:nth-child(odd) td{background:var(--light);}
+table.gov input, table.gov select{width:100%; border:1px solid transparent; background:transparent; font-size:.85rem; padding:5px 4px; text-align:center; font-family:inherit; color:var(--dark); border-radius:4px;}
+table.gov input:hover{border-color:var(--line); background:#fff;}
+table.gov input:focus{background:#fff;}
+td.ord{white-space:nowrap; width:86px;}
+td.ord .n{font-weight:800; display:inline-block; width:18px;}
+td.est input{font-weight:700;}
+.mini{background:#fff; border:1px solid var(--line); color:var(--dark); width:24px; height:24px; border-radius:5px; font-size:.75rem; line-height:1;}
+.mini:hover{background:var(--light);}
+.mini.del{color:#B4232A;}
+.flag{display:inline-block; background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber); font-size:.6rem; font-weight:700; padding:1px 5px; border-radius:9px; margin-top:3px; letter-spacing:.04em;}
+.statgrid{display:flex; gap:4px; justify-content:center;}
+.statgrid button{padding:4px 8px; font-size:.68rem; border:1px solid var(--line); background:#fff; color:var(--grey); border-radius:5px; font-weight:700;}
+.statgrid button.on{background:var(--sky); color:#fff; border-color:var(--sky);}
+.exportbar{display:flex; gap:12px; flex-wrap:wrap; align-items:center;}
+.filename{font-size:.78rem; color:var(--grey); font-family:ui-monospace,Consolas,monospace;}
+footer{color:var(--grey); font-size:.72rem; text-align:center; margin-top:26px;}
+/* print view */
+#printview{display:none;}
+@media print{
+  body *{visibility:hidden;}
+  #printview, #printview *{visibility:visible;}
+  #printview{display:block; position:absolute; top:0; left:0; width:100%;}
+  @page{size:legal landscape; margin:8mm;}
+}
+#printview{font-family:"Arial Narrow",Arial,sans-serif; color:#000; padding:6px;}
+#printview .pv-head{text-align:center; font-weight:800; font-size:13pt;}
+#printview .pv-line{display:flex; justify-content:space-between; font-weight:800; font-size:12pt; border-bottom:1px solid #000; margin-top:6px;}
+#printview table{border-collapse:collapse; width:100%; margin-top:2px;}
+#printview th,#printview td{border:1px solid #000; padding:4px; font-size:10.5pt; text-align:center;}
+#printview th{font-weight:800;}
+#printview .sig{display:flex; justify-content:space-around; margin-top:14px; font-size:9.5pt; font-weight:700;}
+#printview .sig div p{margin-top:10px;}
+@media(max-width:700px){ header h1{font-size:1.02rem;} }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>CRH GENSX C OT EXL</h1>
+    <p>Google Calendar printout → WRHA / Cornwall Regional Hospital theatre list · General Surgery Firm C · Dr. Chapman Longmore</p>
+  </div>
+  <button id="fullbtn" class="hdr-full" title="Full page view" aria-label="Full page view">&#x26F6;</button>
+</header>
+<main>
+
+<section>
+  <div class="sec-title">1 · SOURCE</div>
+  <div class="sec-body">
+    <div class="drop" id="drop" tabindex="0">
+      <b>Drop the calendar printout PDF here</b> or tap to choose a file
+      <small>Needs internet the first time (PDF reader loads from the web). Offline? Paste the printout text below instead.</small>
+      <input type="file" id="file" accept="application/pdf" hidden>
+    </div>
+    <textarea id="pastebox" placeholder="Offline route: open the printout, select-all, copy, and paste the text here…"></textarea>
+    <div class="rowflex" style="margin-top:12px;">
+      <label class="fld">LIST DATE
+        <input type="date" id="listdate">
+      </label>
+      <label class="fld">SITE
+        <select id="site">
+          <option value="FALMOUTH">FALMOUTH</option>
+          <option value="CRH">CRH</option>
+        </select>
+      </label>
+      <button class="btn" id="parsebtn">Read cases</button>
+    </div>
+    <div class="msg" id="srcmsg">No source loaded yet.</div>
+  </div>
+</section>
+
+<section id="reviewsec" style="display:none;">
+  <div class="sec-title">2 · REVIEW &amp; CORRECT — this is what the hospital receives</div>
+  <div class="sec-body">
+    <div class="gov-wrap">
+      <table class="gov" id="govtable">
+        <thead>
+          <tr>
+            <th style="width:86px">ORDER</th>
+            <th style="width:84px" title="Expected surgical time: calendar slot length in minutes">EST (MIN)</th>
+            <th>NAME</th><th style="width:90px">DOC #/DOB</th>
+            <th style="width:64px">AGE</th><th style="width:64px">WARD</th>
+            <th>DIAGNOSIS</th><th>SURGICAL PROCEDURE</th>
+            <th style="width:96px">ANAESTHESIA</th><th style="width:110px">STATUS</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;"><button class="btn ghost" id="addrow">+ Add a case</button></div>
+    <div class="msg">Amber tags mark values the app inferred — check them before exporting. Everything is editable in place.</div>
+  </div>
+</section>
+
+<section id="exportsec" style="display:none;">
+  <div class="sec-title">3 · EXPORT</div>
+  <div class="sec-body exportbar">
+    <button class="btn" id="xlsxbtn">Download Excel (.xlsx)</button>
+    <button class="btn ghost" id="printbtn">Print view</button>
+    <span class="filename" id="fname"></span>
+  </div>
+</section>
+
+<footer>Firm C clinical tools · Cornwall Regional Hospital, Montego Bay · This page stores nothing and sends nothing.</footer>
+</main>
+
+<div id="printview"></div>
+
+<script>
+/* ============ state ============ */
+let cases = []; // {name,doc,age,ward,est,dx,proc,ana,status,flags:{}}
+const TICK = "√";
+const $ = id => document.getElementById(id);
+
+/* ============ pdf input ============ */
+const drop = $("drop"), fileInput = $("file");
+drop.addEventListener("click", ()=>fileInput.click());
+drop.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" ") fileInput.click(); });
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("drag");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("drag");}));
+drop.addEventListener("drop", e=>{ const f=e.dataTransfer.files[0]; if(f) readPdf(f); });
+fileInput.addEventListener("change", ()=>{ if(fileInput.files[0]) readPdf(fileInput.files[0]); });
+
+let pdfjsReady = null;
+function loadPdfJs(){
+  if(pdfjsReady) return pdfjsReady;
+  pdfjsReady = new Promise((res,rej)=>{
+    const s=document.createElement("script");
+    s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload=()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; res(); };
+    s.onerror=()=>rej(new Error("offline"));
+    document.head.appendChild(s);
+  });
+  return pdfjsReady;
+}
+async function readPdf(f){
+  const m=$("srcmsg"); m.className="msg"; m.textContent="Reading "+f.name+" …";
+  try{
+    await loadPdfJs();
+    const buf=await f.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    let text="";
+    for(let p=1;p<=pdf.numPages;p++){
+      const pg=await pdf.getPage(p);
+      const tc=await pg.getTextContent();
+      let lastY=null;
+      tc.items.forEach(it=>{
+        if(lastY!==null && Math.abs(it.transform[5]-lastY)>3) text+="\n";
+        text+=it.str+" ";
+        lastY=it.transform[5];
+      });
+      text+="\n";
+    }
+    $("pastebox").value=text.trim();
+    m.textContent="PDF read ("+pdf.numPages+" page"+(pdf.numPages>1?"s":"")+"). Now press 'Read cases'.";
+  }catch(err){
+    m.className="msg err";
+    m.textContent = err.message==="offline"
+      ? "Couldn't load the PDF reader (no internet). Use the paste box instead — it works fully offline."
+      : "Couldn't read that PDF. Use the paste box instead.";
+  }
+}
+
+/* ============ parser ============ */
+const MONTHS=["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+function to24(h,ap){ h=+h; if(ap.toLowerCase()==="pm"&&h!==12)h+=12; if(ap.toLowerCase()==="am"&&h===12)h=0; return h; }
+
+function parseSource(){
+  const raw=$("pastebox").value;
+  const m=$("srcmsg");
+  if(!raw.trim()){ m.className="msg err"; m.textContent="Nothing to read — load a PDF or paste the printout text first."; return; }
+
+  // site
+  if(/FAL\.?\s*\.?\s*OT/i.test(raw)) $("site").value="FALMOUTH";
+  else if(/CRH\s+OT/i.test(raw)) $("site").value="CRH";
+
+  // date e.g. "Tue Jul 7, 2026"
+  const dm=raw.match(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\.?,?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/i);
+  if(dm){
+    const mo=MONTHS.findIndex(x=>x.startsWith(dm[1].toUpperCase()))+1;
+    $("listdate").value=dm[3]+"-"+String(mo).padStart(2,"0")+"-"+String(+dm[2]).padStart(2,"0");
+  }
+
+  // split entries: text chunk followed by "6am - 7am" or "6:15am - 7:45am"
+  const re=/([^\n]{6,}?)\s*\n?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*[–\-]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/gi;
+  const found=[];
+  let mt;
+  while((mt=re.exec(raw))!==null){
+    const chunk=mt[1].trim();
+    if(!/\d{1,3}\s*\/\s*[MF]\b|\d{1,3}\s*[MF]\b/i.test(chunk)) continue; // must contain age/sex
+    const h24=to24(mt[2], mt[4]), mm=+(mt[3]||0);
+    const e24=to24(mt[5], mt[7]), em=+(mt[6]||0);
+    let dur=(e24*60+em)-(h24*60+mm);   // booked slot length in minutes
+    if(dur<=0) dur+=1440;              // slot running past midnight
+    found.push({t:h24*60+mm, est:String(dur), text:chunk});
+  }
+  found.sort((a,b)=>a.t-b.t);
+
+  cases=found.map(f=>parseEntry(f.text, f.est));
+  if(!cases.length){ m.className="msg err"; m.textContent="No patient entries recognised — check the pasted text contains the case lines (name, age/sex, Reg #)."; return; }
+  m.className="msg"; m.textContent=cases.length+" case"+(cases.length>1?"s":"")+", in theatre order. Review below.";
+  render();
+  $("reviewsec").style.display=$("exportsec").style.display="block";
+  updateFname();
+}
+
+function parseEntry(text, est){
+  const flags={};
+  let t=text.replace(/\s+/g," ").trim();
+
+  // age/sex
+  const am=t.match(/(.+?)[\.]* *\*{0,4}\s*(\d{1,3})\s*\/?\s*([MF])\b/i);
+  let name="", age="";
+  if(am){ name=am[1].replace(/[*.,\s]+$/,"").trim(); age=am[2]+"/"+am[3].toUpperCase(); t=t.slice(am[0].length); }
+  else { name=t; flags.name=true; }
+  name=name.replace(/\*+/g,"").trim();
+
+  // reg
+  let doc="";
+  const rm=t.match(/reg\.?\s*#?:?\s*(nyr|\d{4,7})/i);
+  if(rm){ doc=/nyr/i.test(rm[1])?"NYR":rm[1]; } else flags.doc=true;
+
+  // anaesthesia / category
+  let ana="";
+  if(/local\s*\+\s*sed|la\s*\/\s*sed/i.test(t)) ana="LA/Sed";
+  else if(/sedation/i.test(t)&&/local/i.test(t)) ana="LA/Sed";
+  else if(/\bGA\b|general/i.test(t)) ana="GA";
+  else if(/local|\\bLA\\b/i.test(t)) ana="LA";
+
+  // procedure segment: before "Reg"
+  let proc=t;
+  const cut=t.search(/reg\.?\s*#?/i);
+  if(cut>-1) proc=t.slice(0,cut);
+  proc=proc.replace(/^\W+|\W+$/g,"").replace(/\s+/g," ").trim();
+
+  const d=deriveDxProc(proc);
+  if(!ana){ ana=d.anaDefault||""; if(ana) flags.ana=true; }
+  if(d.inferred) flags.dx=true;
+
+  return {name, doc, age, ward:"DC", est:est||"", dx:d.dx, proc:d.proc, ana, status:"PUBLIC", flags};
+}
+
+function deriveDxProc(p){
+  const L=p.toLowerCase();
+  if(/ex\s*\.?\s*bx|excis/i.test(L)){
+    let rest=p.replace(/ex\s*\.?\s*bx\./i,"").replace(/excisional?\s*(biopsy)?/i,"").replace(/^[\s.,]+/,"").replace(/^\?\s*/,"?").trim();
+    if(!rest) rest=p;
+    return {dx:rest.charAt(0).toUpperCase()+rest.slice(1), proc:"Excisional Biopsy", anaDefault:"LA", inferred:true};
+  }
+  if(/chole/.test(L)){
+    const uh=/\buh\b/i.test(L);
+    return {dx:"Symptomatic Gallstones"+(uh?" + UH":""), proc:"Lap. Cholecystectomy"+(uh?" + UH Repair":""), anaDefault:"GA", inferred:true};
+  }
+  if(/h(a)?emorrhoid/.test(L)) return {dx:"Haemorrhoids", proc:"Haemorrhoidectomy", anaDefault:"GA", inferred:true};
+  if(/\brih\b/.test(L)) return {dx:"RIH", proc:/mesh/.test(L)?"RIH Mesh Repair":"RIH Repair", inferred:true};
+  if(/\blih\b/.test(L)) return {dx:"LIH", proc:/mesh/.test(L)?"LIH Mesh Repair":"LIH Repair", inferred:true};
+  if(/\bsuh\b/.test(L)) return {dx:"SUH", proc:"SUH Repair", anaDefault:"GA", inferred:true};
+  if(/\buh\b/.test(L)){
+    const lg=/large/.test(L);
+    return {dx:(lg?"Large UH":"UH"), proc:(lg?"Large UH Repair":"UH Repair"), anaDefault:lg?"GA":"", inferred:true};
+  }
+  return {dx:p, proc:p, inferred:false};
+}
+
+/* ============ review table ============ */
+function render(){
+  const tb=$("tbody"); tb.innerHTML="";
+  cases.forEach((c,i)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=
+      `<td class="ord"><span class="n">${i+1}</span>
+        <button class="mini" data-a="up" data-i="${i}" title="Move up">↑</button>
+        <button class="mini" data-a="dn" data-i="${i}" title="Move down">↓</button>
+        <button class="mini del" data-a="del" data-i="${i}" title="Remove">✕</button></td>`+
+      cell(i,"est",c)+
+      cell(i,"name",c)+cell(i,"doc",c)+cell(i,"age",c)+cell(i,"ward",c)+cell(i,"dx",c)+cell(i,"proc",c)+
+      `<td><select data-f="ana" data-i="${i}">
+          ${["","LA","GA","LA/Sed"].map(o=>`<option value="${o}" ${c.ana===o?"selected":""}>${o||"—"}</option>`).join("")}
+        </select>${c.flags.ana?'<span class="flag">INFERRED</span>':''}</td>`+
+      `<td><div class="statgrid">
+        <button data-a="st" data-v="PUBLIC" data-i="${i}" class="${c.status==="PUBLIC"?"on":""}">PUBLIC</button>
+        <button data-a="st" data-v="PRIVATE" data-i="${i}" class="${c.status==="PRIVATE"?"on":""}">PRIVATE</button>
+      </div></td>`;
+    tb.appendChild(tr);
+  });
+}
+function cell(i,f,c){
+  return `<td><input data-f="${f}" data-i="${i}" value="${(c[f]||"").replace(/"/g,"&quot;")}"/>${c.flags&&c.flags[f]?'<span class="flag">CHECK</span>':''}</td>`;
+}
+document.addEventListener("input", e=>{
+  const f=e.target.dataset.f, i=e.target.dataset.i;
+  if(f!==undefined && i!==undefined){ cases[i][f]=e.target.value; if(cases[i].flags) delete cases[i].flags[f]; }
+});
+document.addEventListener("click", e=>{
+  const a=e.target.dataset.a; if(!a) return;
+  const i=+e.target.dataset.i;
+  if(a==="up"&&i>0){ [cases[i-1],cases[i]]=[cases[i],cases[i-1]]; render(); }
+  if(a==="dn"&&i<cases.length-1){ [cases[i+1],cases[i]]=[cases[i],cases[i+1]]; render(); }
+  if(a==="del"){ cases.splice(i,1); render(); }
+  if(a==="st"){ cases[i].status=e.target.dataset.v; render(); }
+});
+$("addrow").addEventListener("click", ()=>{
+  cases.push({name:"",doc:"",age:"",ward:"DC",est:"",dx:"",proc:"",ana:"",status:"PUBLIC",flags:{}});
+  render();
+});
+$("parsebtn").addEventListener("click", parseSource);
+$("listdate").addEventListener("change", updateFname);
+$("site").addEventListener("change", updateFname);
+
+/* ============ date helpers ============ */
+const DAYS=["SUNDAY","MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY"];
+function dateBits(){
+  const v=$("listdate").value;
+  if(!v) return null;
+  const d=new Date(v+"T12:00:00");
+  return {day:DAYS[d.getDay()], month:MONTHS[d.getMonth()], dnum:d.getDate(), year:d.getFullYear(),
+          monthTitle:MONTHS[d.getMonth()].charAt(0)+MONTHS[d.getMonth()].slice(1).toLowerCase()};
+}
+function updateFname(){
+  const b=dateBits();
+  $("fname").textContent = b ? `Gen_Sx_C_OT_List_${b.monthTitle}_${b.dnum}_${b.year}_${$("site").value}.xlsx` : "Pick a list date.";
+}
+
+/* ============ xlsx builder (pure JS, no libraries) ============ */
+function xmlEsc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function colName(n){ let s=""; while(n>0){ const r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=Math.floor((n-1)/26); } return s; }
+
+function buildSheetXml(site, b){
+  const rows=[];
+  const c=(col,r,style,val)=> val===undefined||val===""
+    ? `<c r="${col}${r}" s="${style}"/>`
+    : `<c r="${col}${r}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(val)}</t></is></c>`;
+
+  rows.push(`<row r="3" ht="23.25" customHeight="1">${c("A",3,1,"SURGERIES TO BE DONE  @ "+site+" SITE")}</row>`);
+  rows.push(`<row r="4" ht="23.25" customHeight="1">${c("A",4,2,"SURGEONS: Drs. Hunter, Longmore  et al  (Firm C)")}${c("J",4,2,"DATE: "+b.day+", "+b.month+" "+b.dnum+", "+b.year)}</row>`);
+
+  const h5={A:"NAME",B:"DOC #/DOB",C:"AGE",D:"WARD",E:"DIAGNOSIS",F:"SURGICAL PROCEDURE",G:"STATUS",I:"OUTCOME ",K:"PROCEDURE TIMES",N:"REASON FOR CANCELLATION",O:"NAME OF  PRIMARY ATTENDING SURGEON /ANAESTHEIST "};
+  let r5="";
+  for(let i=1;i<=15;i++){ const col=colName(i); r5+=c(col,5,3,h5[col]); }
+  rows.push(`<row r="5" ht="116.25" customHeight="1">${r5}</row>`);
+
+  const h6={G:"PRIVATE ",H:"PUBLIC",I:"COMPLETED",J:"CANCELLED",K:"EST (MIN)",L:"START ",M:"END"};
+  let r6="";
+  for(let i=1;i<=15;i++){ const col=colName(i); r6+=c(col,6,4,h6[col]); }
+  rows.push(`<row r="6" ht="33" customHeight="1">${r6}</row>`);
+
+  cases.forEach((cs,idx)=>{
+    const r=7+idx;
+    const proc=cs.proc+(cs.ana?` (${cs.ana})`:"");
+    const vals={A:cs.name,B:cs.doc,C:cs.age,D:cs.ward,E:cs.dx,F:proc,
+                G:cs.status==="PRIVATE"?TICK:"",H:cs.status==="PUBLIC"?TICK:"",K:cs.est,L:"",M:""};
+    let rw="";
+    for(let i=1;i<=15;i++){ const col=colName(i); rw+=c(col,r,3,vals[col]); }
+    rows.push(`<row r="${r}" ht="56.25" customHeight="1">${rw}</row>`);
+  });
+
+  const sig=7+cases.length+1;
+  const sigs=[
+    [sig,  "E","DEPARTMENTAL SISTER/DESIGNATE_______________________","J","ANESTHESIST_____________________________"],
+    [sig+2,"E","CONSULTANT SURGEON_______________________________","J","S.M.O. SIGNATURE  (PRE)____________________"],
+    [sig+4,"E","DEPARTMENTAL SISTER/DESIGNATE_______________________","J","S.M.O. SIGNATURE (POST)___________________"],
+    [sig+6,null,null,"J","ANAESTHESIST __________________________"],
+  ];
+  sigs.forEach(([r,c1,t1,c2,t2])=>{
+    let rw=""; if(c1) rw+=c(c1,r,5,t1); rw+=c(c2,r,5,t2);
+    rows.push(`<row r="${r}">${rw}</row>`);
+  });
+
+  const lastRow=sig+6;
+  const widths={A:26,B:13.8,C:8.4,D:11.2,E:23,F:30.2,G:11,H:11,I:15.4,J:14.4,K:10,L:10,M:10,N:22,O:25.7};
+  const cols=Object.keys(widths).map((k,i)=>`<col min="${i+1}" max="${i+1}" width="${widths[k]}" customWidth="1"/>`).join("");
+  const merges=["G5:H5","I5:J5","K5:M5","N5:N6","A5:A6","B5:B6","C5:C6","D5:D6","E5:E6","F5:F6","O5:O6"];
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
+<dimension ref="A1:O${lastRow}"/>
+<sheetViews><sheetView workbookViewId="0"/></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/>
+<cols>${cols}</cols>
+<sheetData>${rows.join("")}</sheetData>
+<mergeCells count="${merges.length}">${merges.map(m=>`<mergeCell ref="${m}"/>`).join("")}</mergeCells>
+<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>
+<pageSetup paperSize="5" orientation="landscape" fitToWidth="1" fitToHeight="1"/>
+</worksheet>`;
+}
+
+const STYLES_XML=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="3">
+<font><sz val="11"/><name val="Aptos Narrow"/></font>
+<font><b/><sz val="18"/><name val="Aptos Narrow"/></font>
+<font><b/><sz val="14"/><name val="Aptos Narrow"/></font>
+</fonts>
+<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
+<borders count="3">
+<border><left/><right/><top/><bottom/><diagonal/></border>
+<border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border>
+<border><left/><right/><top/><bottom style="thin"/><diagonal/></border>
+</borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="6">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1"/>
+<xf numFmtId="49" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1" applyNumberFormat="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+
+const CONTENT_TYPES=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`;
+const ROOT_RELS=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+const WB_XML=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`;
+const WB_RELS=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+/* -- minimal ZIP writer (stored entries) -- */
+const CRC_TABLE=(()=>{ const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0; } return t;})();
+function crc32(u8){ let c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c=CRC_TABLE[(c^u8[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function makeZip(files){ // files: [{name, text}]
+  const enc=new TextEncoder();
+  const parts=[], central=[]; let offset=0;
+  files.forEach(f=>{
+    const nm=enc.encode(f.name), data=enc.encode(f.text), crc=crc32(data);
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0,true);
+    lh.setUint16(8,0,true); lh.setUint16(10,0,true); lh.setUint16(12,0x21,true);
+    lh.setUint32(14,crc,true); lh.setUint32(18,data.length,true); lh.setUint32(22,data.length,true);
+    lh.setUint16(26,nm.length,true); lh.setUint16(28,0,true);
+    parts.push(new Uint8Array(lh.buffer), nm, data);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true);
+    ch.setUint16(8,0,true); ch.setUint16(10,0,true); ch.setUint16(12,0,true); ch.setUint16(14,0x21,true);
+    ch.setUint32(16,crc,true); ch.setUint32(20,data.length,true); ch.setUint32(24,data.length,true);
+    ch.setUint16(28,nm.length,true);
+    ch.setUint32(42,offset,true);
+    central.push(new Uint8Array(ch.buffer), nm);
+    offset+=30+nm.length+data.length;
+  });
+  const cdSize=central.reduce((a,p)=>a+p.length,0);
+  const end=new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true); end.setUint16(8,files.length,true); end.setUint16(10,files.length,true);
+  end.setUint32(12,cdSize,true); end.setUint32(16,offset,true);
+  return new Blob([...parts,...central,new Uint8Array(end.buffer)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+
+$("xlsxbtn").addEventListener("click", ()=>{
+  const b=dateBits();
+  if(!b){ alert("Pick the list date first."); return; }
+  if(!cases.length){ alert("No cases to export."); return; }
+  const site=$("site").value;
+  const blob=makeZip([
+    {name:"[Content_Types].xml", text:CONTENT_TYPES},
+    {name:"_rels/.rels", text:ROOT_RELS},
+    {name:"xl/workbook.xml", text:WB_XML},
+    {name:"xl/_rels/workbook.xml.rels", text:WB_RELS},
+    {name:"xl/styles.xml", text:STYLES_XML},
+    {name:"xl/worksheets/sheet1.xml", text:buildSheetXml(site,b)},
+  ]);
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`Gen_Sx_C_OT_List_${b.monthTitle}_${b.dnum}_${b.year}_${site}.xlsx`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+});
+
+/* ============ print view ============ */
+function buildListHTML(b, site){
+  return `
+  <div class="pv-head">WESTERN REGIONAL HEALTH AUTHORITY<br/>CORNWALL REGIONAL HOSPITAL</div>
+  <div style="font-weight:800; font-size:12pt; margin-top:8px;">SURGERIES TO BE DONE  @ ${site} SITE</div>
+  <div class="pv-line"><span>SURGEONS: Drs. Hunter, Longmore  et al  (Firm C)</span><span>DATE: ${b.day}, ${b.month} ${b.dnum}, ${b.year}</span></div>
+  <table>
+    <tr><th rowspan="2">NAME</th><th rowspan="2">DOC #/DOB</th><th rowspan="2">AGE</th><th rowspan="2">WARD</th>
+        <th rowspan="2">DIAGNOSIS</th><th rowspan="2">SURGICAL PROCEDURE</th>
+        <th colspan="2">STATUS</th><th colspan="2">OUTCOME</th><th colspan="3">PROCEDURE TIMES</th>
+        <th rowspan="2">REASON FOR CANCELLATION</th><th rowspan="2">NAME OF PRIMARY ATTENDING SURGEON /ANAESTHEIST</th></tr>
+    <tr><th>PRIVATE</th><th>PUBLIC</th><th>COMPLETED</th><th>CANCELLED</th><th>EST (MIN)</th><th>START</th><th>END</th></tr>
+    ${cases.map(cs=>`<tr>
+      <td>${xmlEsc(cs.name)}</td><td>${xmlEsc(cs.doc)}</td><td>${xmlEsc(cs.age)}</td><td>${xmlEsc(cs.ward)}</td>
+      <td>${xmlEsc(cs.dx)}</td><td>${xmlEsc(cs.proc)}${cs.ana?" ("+cs.ana+")":""}</td>
+      <td>${cs.status==="PRIVATE"?TICK:""}</td><td>${cs.status==="PUBLIC"?TICK:""}</td>
+      <td></td><td></td><td>${xmlEsc(cs.est)}</td><td></td><td></td><td></td><td></td></tr>`).join("")}
+  </table>
+  <div class="sig">
+    <div><p>DEPARTMENTAL SISTER/DESIGNATE_______________</p><p>CONSULTANT SURGEON_______________</p><p>DEPARTMENTAL SISTER/DESIGNATE_______________</p></div>
+    <div><p>ANESTHESIST_______________</p><p>S.M.O. SIGNATURE (PRE)_______________</p><p>S.M.O. SIGNATURE (POST)_______________</p><p>ANESTHESIST _______________</p></div>
+  </div>`;
+}
+$("printbtn").addEventListener("click", ()=>{
+  const b=dateBits();
+  if(!b){ alert("Pick the list date first."); return; }
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${getStyles()}</style></head><body>${buildListHTML(b, $("site").value)}</body></html>`;
+  const w=window.open();
+  w.document.write(html);
+  w.document.close();
+});
+
+function getStyles(){
+  return `body{font-family:"Arial Narrow",Arial,sans-serif;color:#000;padding:6px;margin:0;}
+.pv-head{text-align:center;font-weight:800;font-size:13pt;margin-bottom:12px;}
+.pv-line{display:flex;justify-content:space-between;font-weight:800;font-size:12pt;border-bottom:1px solid #000;margin-top:6px;margin-bottom:6px;}
+table{border-collapse:collapse;width:100%;margin-top:2px;}
+th,td{border:1px solid #000;padding:4px;font-size:10.5pt;text-align:center;}
+th{font-weight:800;}
+.sig{display:flex;justify-content:space-around;margin-top:14px;font-size:9.5pt;font-weight:700;}
+.sig div{flex:1;}
+.sig p{margin:0;padding:10px 0;}
+@media print{body{margin:0;padding:0;}th,td{font-size:9pt;padding:3px;}}`;
+}
+$("fullbtn").addEventListener("click", ()=>{
+  if(document.fullscreenElement){ document.exitFullscreen().catch(()=>{}); }
+  else{ document.documentElement.requestFullscreen().catch(()=>{}); }
+});
+</script>
+</body>
+</html>
