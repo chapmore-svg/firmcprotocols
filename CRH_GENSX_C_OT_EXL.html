@@ -22,7 +22,7 @@ section{background:var(--white); border:1px solid var(--line); border-radius:10p
 .sec-body{padding:14px;}
 .rowflex{display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;}
 label.fld{display:flex; flex-direction:column; gap:4px; font-size:.72rem; font-weight:600; color:var(--grey); letter-spacing:.05em;}
-input[type=date], select, input[type=text]{border:1px solid var(--line); border-radius:6px; padding:7px 9px; font-size:.9rem; color:var(--dark); background:#fff; font-family:inherit;}
+input[type=date], select, input[type=text], input[type=number]{border:1px solid var(--line); border-radius:6px; padding:7px 9px; font-size:.9rem; color:var(--dark); background:#fff; font-family:inherit;}
 input:focus, select:focus, textarea:focus, button:focus-visible{outline:2px solid var(--sky); outline-offset:1px;}
 .drop{border:2px dashed var(--sky); border-radius:8px; background:var(--light); padding:22px; text-align:center; cursor:pointer; transition:background .15s;}
 .drop.drag{background:#D2ECF5;}
@@ -37,6 +37,15 @@ button{font-family:inherit; cursor:pointer; border:none; border-radius:7px; font
 .btn:disabled{background:#A9C9D6; cursor:not-allowed;}
 .msg{font-size:.82rem; margin-top:8px; color:var(--grey);}
 .msg.err{color:#B4232A;}
+/* list total vs session */
+.totals{display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:10px 12px; margin-bottom:12px; border:1px solid var(--line); border-radius:8px; background:var(--light); font-size:.85rem;}
+.totals b{font-size:1rem;}
+.totals .bar{flex:1 1 180px; height:8px; border-radius:4px; background:#fff; border:1px solid var(--line); overflow:hidden; min-width:120px;}
+.totals .bar i{display:block; height:100%; background:var(--sky);}
+.totals.over{background:#FBEAEA; border-color:#E3A6A8;}
+.totals.over .bar i{background:#B4232A;}
+.totals .note{font-weight:700;}
+.totals.over .note{color:#B4232A;}
 /* government-style review table */
 .gov-wrap{overflow-x:auto;}
 table.gov{border-collapse:collapse; width:100%; min-width:960px; font-family:"Arial Narrow",Arial,sans-serif;}
@@ -107,7 +116,15 @@ footer{color:var(--grey); font-size:.72rem; text-align:center; margin-top:26px;}
           <option value="CRH">CRH</option>
         </select>
       </label>
+      <label class="fld" title="Length of the theatre session, used to check the list fits. Remembered on this device.">SESSION (MIN)
+        <input type="number" id="session" min="30" step="15" style="width:96px">
+      </label>
       <button class="btn" id="parsebtn">Read cases</button>
+    </div>
+    <div class="rowflex" style="margin-top:12px;">
+      <label class="fld" style="flex:1 1 320px;" title="Printed on the list and the Excel file. Remembered on this device.">SURGEONS
+        <input type="text" id="surgeons" style="width:100%">
+      </label>
     </div>
     <div class="msg" id="srcmsg">No source loaded yet.</div>
   </div>
@@ -116,6 +133,7 @@ footer{color:var(--grey); font-size:.72rem; text-align:center; margin-top:26px;}
 <section id="reviewsec" style="display:none;">
   <div class="sec-title">2 · REVIEW &amp; CORRECT — this is what the hospital receives</div>
   <div class="sec-body">
+    <div class="totals" id="totals"></div>
     <div class="gov-wrap">
       <table class="gov" id="govtable">
         <thead>
@@ -145,7 +163,7 @@ footer{color:var(--grey); font-size:.72rem; text-align:center; margin-top:26px;}
   </div>
 </section>
 
-<footer>Firm C clinical tools · Cornwall Regional Hospital, Montego Bay · This page stores nothing and sends nothing.</footer>
+<footer>Firm C clinical tools · Cornwall Regional Hospital, Montego Bay · Patient details are never stored or sent; only the surgeons line and session length are remembered on this device.</footer>
 </main>
 
 <div id="printview"></div>
@@ -336,13 +354,50 @@ function render(){
       </div></td>`;
     tb.appendChild(tr);
   });
+  updateTotals();
 }
+
+/* ============ list total vs session length ============ */
+function fmtHM(m){ const h=Math.floor(m/60), r=m%60; return h ? (r ? `${h} h ${r} min` : `${h} h`) : `${r} min`; }
+function updateTotals(){
+  const el=$("totals"); if(!el) return;
+  const total=cases.reduce((s,c)=>s+(parseInt(c.est,10)||0),0);
+  const missing=cases.filter(c=>!(parseInt(c.est,10)>0)).length;
+  const sess=parseInt($("session").value,10)||0;
+  const n=cases.length;
+  let html=`<span><b>${n}</b> case${n===1?"":"s"} · <b>${total}</b> min booked (${fmtHM(total)})</span>`;
+  let over=false;
+  if(sess>0){
+    const pct=Math.min(100, Math.round(total/sess*100));
+    over=total>sess;
+    html+=`<span class="bar" aria-hidden="true"><i style="width:${pct}%"></i></span>`;
+    html+= over
+      ? `<span class="note">${fmtHM(total-sess)} over the ${fmtHM(sess)} session</span>`
+      : total===sess
+        ? `<span class="note">Fills the ${fmtHM(sess)} session exactly</span>`
+        : `<span class="note">${fmtHM(sess-total)} spare of ${fmtHM(sess)}</span>`;
+  }
+  if(missing) html+=`<span>${missing} case${missing===1?" has":"s have"} no EST (MIN)</span>`;
+  el.innerHTML=html;
+  el.classList.toggle("over", over);
+}
+
+/* ============ remembered settings (this device only) ============ */
+const DEFAULT_SURGEONS="Drs. Hunter, Longmore  et al  (Firm C)";
+const DEFAULT_SESSION="480";
+function store(k,v){ try{ localStorage.setItem("crhot."+k,v); }catch(e){} }
+function recall(k){ try{ return localStorage.getItem("crhot."+k); }catch(e){ return null; } }
+function surgeonsText(){ return $("surgeons").value.trim() || DEFAULT_SURGEONS; }
+$("surgeons").value = recall("surgeons") ?? DEFAULT_SURGEONS;
+$("session").value  = recall("session")  ?? DEFAULT_SESSION;
+$("surgeons").addEventListener("change", ()=>store("surgeons", $("surgeons").value.trim()||DEFAULT_SURGEONS));
+$("session").addEventListener("input", ()=>{ store("session", $("session").value); updateTotals(); });
 function cell(i,f,c){
   return `<td><input data-f="${f}" data-i="${i}" value="${(c[f]||"").replace(/"/g,"&quot;")}"/>${c.flags&&c.flags[f]?'<span class="flag">CHECK</span>':''}</td>`;
 }
 document.addEventListener("input", e=>{
   const f=e.target.dataset.f, i=e.target.dataset.i;
-  if(f!==undefined && i!==undefined){ cases[i][f]=e.target.value; if(cases[i].flags) delete cases[i].flags[f]; }
+  if(f!==undefined && i!==undefined){ cases[i][f]=e.target.value; if(cases[i].flags) delete cases[i].flags[f]; if(f==="est") updateTotals(); }
 });
 document.addEventListener("click", e=>{
   const a=e.target.dataset.a; if(!a) return;
@@ -385,7 +440,7 @@ function buildSheetXml(site, b){
     : `<c r="${col}${r}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(val)}</t></is></c>`;
 
   rows.push(`<row r="3" ht="23.25" customHeight="1">${c("A",3,1,"SURGERIES TO BE DONE  @ "+site+" SITE")}</row>`);
-  rows.push(`<row r="4" ht="23.25" customHeight="1">${c("A",4,2,"SURGEONS: Drs. Hunter, Longmore  et al  (Firm C)")}${c("J",4,2,"DATE: "+b.day+", "+b.month+" "+b.dnum+", "+b.year)}</row>`);
+  rows.push(`<row r="4" ht="23.25" customHeight="1">${c("A",4,2,"SURGEONS: "+surgeonsText())}${c("J",4,2,"DATE: "+b.day+", "+b.month+" "+b.dnum+", "+b.year)}</row>`);
 
   const h5={A:"NAME",B:"DOC #/DOB",C:"AGE",D:"WARD",E:"DIAGNOSIS",F:"SURGICAL PROCEDURE",G:"STATUS",I:"OUTCOME ",K:"PROCEDURE TIMES",N:"REASON FOR CANCELLATION",O:"NAME OF  PRIMARY ATTENDING SURGEON /ANAESTHEIST "};
   let r5="";
@@ -541,7 +596,7 @@ function buildListHTML(b, site){
   return `
   <div class="pv-head">WESTERN REGIONAL HEALTH AUTHORITY<br/>CORNWALL REGIONAL HOSPITAL</div>
   <div style="font-weight:800; font-size:12pt; margin-top:8px;">SURGERIES TO BE DONE  @ ${site} SITE</div>
-  <div class="pv-line"><span>SURGEONS: Drs. Hunter, Longmore  et al  (Firm C)</span><span>DATE: ${b.day}, ${b.month} ${b.dnum}, ${b.year}</span></div>
+  <div class="pv-line"><span>SURGEONS: ${xmlEsc(surgeonsText())}</span><span>DATE: ${b.day}, ${b.month} ${b.dnum}, ${b.year}</span></div>
   <table>
     <tr><th rowspan="2">NAME</th><th rowspan="2">DOC #/DOB</th><th rowspan="2">AGE</th><th rowspan="2">WARD</th>
         <th rowspan="2">DIAGNOSIS</th><th rowspan="2">SURGICAL PROCEDURE</th>
