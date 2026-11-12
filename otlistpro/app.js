@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -19,6 +19,8 @@ const DEFAULTS = {
   ward: "DC",
   status: "PUBLIC",
   session: "480",
+  attachXlsx: "1",
+  attachPdf: "1",
 };
 function loadSettings(){
   let s = {};
@@ -498,10 +500,10 @@ function dateBits(){
           monthTitle:month.charAt(0)+month.slice(1).toLowerCase(),
           pretty:d.toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long", year:"numeric"})};
 }
-function fileName(){
+function fileName(ext="xlsx"){
   const b = dateBits(); if(!b) return "";
   const pre = (settings.prefix||"OT_List").replace(/[\\/:*?"<>|]+/g,"_");
-  return `${pre}_${b.monthTitle}_${b.dnum}_${b.year}_${$("site").value}.xlsx`;
+  return `${pre}_${b.monthTitle}_${b.dnum}_${b.year}_${$("site").value}.${ext}`;
 }
 function renderExport(){
   const b = dateBits();
@@ -510,9 +512,11 @@ function renderExport(){
   $("fname").textContent = fileName();
   $("preview").innerHTML = b ? buildListHTML(b) : '<p style="padding:20px">Set the list date on the Upload step first.</p>';
   requestAnimationFrame(fitPreview);
+  $("att-xlsx").checked = settings.attachXlsx==="1";
+  $("att-pdf").checked = settings.attachPdf==="1";
   $("email-help").innerHTML = canShareFiles()
-    ? "<b>Email the list</b> opens a menu of your apps. Choose <b>Gmail</b> or <b>Outlook</b>: it opens with the Excel file attached and the subject and message filled in. Choose who it goes to, then tap Send."
-    : "<b>Email the list</b> downloads the Excel file and opens your email program with the subject and message filled in. <b>Attach the downloaded file</b>, choose who it goes to, then send.";
+    ? "Tap <b>Email the list</b>, then choose <b>Gmail</b> or <b>Outlook</b>. It opens with the ticked files attached and the subject and message filled in. Choose who it goes to, then tap Send."
+    : "Tap <b>Email the list</b>: the ticked files download and a new email opens with the subject and message filled in. <b>Attach the downloaded files</b>, choose who it goes to, then send.";
 }
 // shrink the full-width hospital list so the whole page is visible in the preview
 function fitPreview(){
@@ -680,17 +684,86 @@ function buildXlsx(){
     {name:"xl/worksheets/sheet1.xml", text:buildSheetXml($("site").value, b)},
   ]);
 }
-$("xlsxbtn").addEventListener("click", ()=>{
-  const blob = buildXlsx(); if(!blob) return;
+function downloadBlob(blob, name){
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob); a.download = fileName();
+  a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
+$("xlsxbtn").addEventListener("click", ()=>{
+  const blob = buildXlsx(); if(!blob) return;
+  downloadBlob(blob, fileName("xlsx"));
   toast("Excel file downloaded");
 });
-/* ---- email: hand the Excel file to the device's own email app ---- */
-function canShareFiles(){
-  try{ return !!(navigator.canShare && navigator.canShare({files:[new File([""],"x.xlsx",{type:XLSX_MIME})]})); }catch(e){ return false; }
+
+/* ---- PDF of the hospital list (jsPDF + AutoTable, bundled for offline use) ---- */
+const XLSX_COL_WIDTHS = [26,13.8,8.4,11.2,23,30.2,11,11,15.4,14.4,10,10,10,22,25.7];
+function buildPdf(){
+  const b = dateBits(); if(!b){ toast("Set the list date first."); return null; }
+  if(!cases.length){ toast("No cases to export."); return null; }
+  if(!window.jspdf){ toast("The PDF maker didn't load. Reopen the app and try again."); return null; }
+  const doc = new window.jspdf.jsPDF({orientation:"landscape", unit:"pt", format:"legal"});
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 22.7;
+  const site = $("site").value;
+  doc.setFont("helvetica","bold"); doc.setTextColor(0);
+  doc.setFontSize(13);
+  doc.text(settings.head1 || "", W/2, M+12, {align:"center"});
+  doc.text(settings.head2 || "", W/2, M+28, {align:"center"});
+  doc.setFontSize(12);
+  doc.text(`SURGERIES TO BE DONE  @ ${site} SITE`, M, M+52);
+  doc.setFontSize(11.5);
+  doc.text(`SURGEONS: ${surgeonsText()}`, M, M+70);
+  doc.text(`DATE: ${b.day}, ${b.month} ${b.dnum}, ${b.year}`, W-M, M+70, {align:"right"});
+  doc.setLineWidth(0.8); doc.line(M, M+74, W-M, M+74);
+
+  const scale = (W-2*M) / XLSX_COL_WIDTHS.reduce((a,c)=>a+c,0);
+  const columnStyles = {}; XLSX_COL_WIDTHS.forEach((w,i)=>{ columnStyles[i] = {cellWidth:w*scale}; });
+  const head = [
+    [{content:"NAME",rowSpan:2},{content:"DOC #/DOB",rowSpan:2},{content:"AGE",rowSpan:2},{content:"WARD",rowSpan:2},
+     {content:"DIAGNOSIS",rowSpan:2},{content:"SURGICAL PROCEDURE",rowSpan:2},
+     {content:"STATUS",colSpan:2},{content:"OUTCOME",colSpan:2},{content:"PROCEDURE TIMES",colSpan:3},
+     {content:"REASON FOR CANCELLATION",rowSpan:2},{content:"NAME OF PRIMARY ATTENDING SURGEON /ANAESTHEIST",rowSpan:2}],
+    ["PRIVATE","PUBLIC","COMPLETED","CANCELLED","EST (MIN)","START","END"],
+  ];
+  const body = cases.map(cs=>[cs.name, cs.doc, cs.age, cs.ward, cs.dx, cs.proc+(cs.ana?` (${cs.ana})`:""),
+    cs.status==="PRIVATE"?"√":"", cs.status==="PUBLIC"?"√":"", "", "", cs.est, "", "", "", ""]);
+  doc.autoTable({
+    startY: M+84, head, body, theme:"grid", margin:{left:M, right:M, bottom:M},
+    styles:{font:"helvetica", fontSize:9, textColor:0, lineColor:0, lineWidth:0.6, halign:"center", valign:"middle", cellPadding:3, overflow:"linebreak"},
+    headStyles:{fontStyle:"bold", fillColor:[255,255,255], textColor:0, fontSize:8.5, cellPadding:2.5},
+    bodyStyles:{minCellHeight:30, fillColor:[255,255,255]},
+    columnStyles,
+    // the standard PDF font has no tick symbol, so draw one
+    didParseCell: d=>{ if(d.section==="body" && (d.column.index===6 || d.column.index===7) && d.cell.raw==="√"){ d.cell.text = [""]; d.cell.tick = true; } },
+    didDrawCell: d=>{
+      if(!d.cell.tick) return;
+      const cx = d.cell.x + d.cell.width/2, cy = d.cell.y + d.cell.height/2;
+      doc.setLineWidth(1.4); doc.line(cx-5, cy, cx-1.5, cy+4); doc.line(cx-1.5, cy+4, cx+6, cy-5);
+    },
+  });
+
+  let y = doc.lastAutoTable.finalY + 26;
+  if(y + 4*22 > H - M){ doc.addPage(); y = M + 20; }
+  doc.setFont("helvetica","bold"); doc.setFontSize(9.5);
+  const left = ["DEPARTMENTAL SISTER/DESIGNATE_______________________","CONSULTANT SURGEON_______________________________","DEPARTMENTAL SISTER/DESIGNATE_______________________"];
+  const right = ["ANESTHESIST_____________________________","S.M.O. SIGNATURE  (PRE)____________________","S.M.O. SIGNATURE (POST)___________________","ANAESTHESIST __________________________"];
+  left.forEach((t,i)=>doc.text(t, M+150, y+i*22));
+  right.forEach((t,i)=>doc.text(t, W/2+60, y+i*22));
+  doc.setProperties({title: fileName("pdf").replace(/\.pdf$/,""), subject:"Operating theatre list", creator:"OT List Pro"});
+  return doc.output("blob");
+}
+$("pdfbtn").addEventListener("click", ()=>{
+  const blob = buildPdf(); if(!blob) return;
+  downloadBlob(blob, fileName("pdf"));
+  toast("PDF downloaded");
+});
+
+/* ---- email: hand the chosen files to the device's own email app ---- */
+function canShareFiles(files){
+  try{
+    files = files || [new File([""],"x.xlsx",{type:XLSX_MIME}), new File([""],"x.pdf",{type:"application/pdf"})];
+    return !!(navigator.canShare && navigator.canShare({files}));
+  }catch(e){ return false; }
 }
 function emailSubject(){
   const b = dateBits();
@@ -702,20 +775,25 @@ function emailBody(){
   return `Good day,\n\nPlease find attached the operating theatre list for ${$("site").value}, ${b ? b.pretty : ""} `+
          `(${cases.length} case${cases.length===1?"":"s"}, ${fmtHM(total)}).\n\nRegards,\n${settings.user || ""}`.trimEnd();
 }
+["att-xlsx","att-pdf"].forEach(id=>$(id).addEventListener("change", ()=>{
+  settings.attachXlsx = $("att-xlsx").checked ? "1" : "0";
+  settings.attachPdf  = $("att-pdf").checked ? "1" : "0";
+  saveSettings(settings);
+}));
 $("emailbtn").addEventListener("click", async ()=>{
-  const blob = buildXlsx(); if(!blob) return;
-  const file = new File([blob], fileName(), {type:XLSX_MIME});
-  if(canShareFiles()){
-    try{ await navigator.share({files:[file], title:emailSubject(), text:emailBody()}); return; }
+  const wantX = $("att-xlsx").checked, wantP = $("att-pdf").checked;
+  if(!wantX && !wantP){ toast("Tick Excel, PDF or both to attach."); return; }
+  const files = [];
+  if(wantX){ const blob = buildXlsx(); if(!blob) return; files.push(new File([blob], fileName("xlsx"), {type:XLSX_MIME})); }
+  if(wantP){ const blob = buildPdf();  if(!blob) return; files.push(new File([blob], fileName("pdf"),  {type:"application/pdf"})); }
+  if(canShareFiles(files)){
+    try{ await navigator.share({files, title:emailSubject(), text:emailBody()}); return; }
     catch(e){ if(e.name==="AbortError") return; }
   }
-  // No share menu on this device: download the file, then open a new email with subject and message filled in.
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob); a.download = fileName();
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-  setTimeout(()=>{ location.href = `mailto:?subject=${encodeURIComponent(emailSubject())}&body=${encodeURIComponent(emailBody())}`; }, 400);
-  toast("Excel downloaded. Attach it to the email that opens.", null, null, 6000);
+  // No share menu on this device: download the files, then open a new email with subject and message filled in.
+  files.forEach((f,i)=>setTimeout(()=>downloadBlob(f, f.name), i*350));
+  setTimeout(()=>{ location.href = `mailto:?subject=${encodeURIComponent(emailSubject())}&body=${encodeURIComponent(emailBody())}`; }, 400 + files.length*350);
+  toast(`${files.length===2?"Excel and PDF":wantX?"Excel file":"PDF"} downloaded. Attach ${files.length===2?"them":"it"} to the email that opens.`, null, null, 6000);
 });
 $("newlist").addEventListener("click", ()=>{
   cases = []; sourceText = ""; $("pastebox").value = ""; $("listdate").value = ""; $("session").value = settings.session;

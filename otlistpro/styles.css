@@ -286,3 +286,13 @@ textarea{width:100%; min-height:120px; margin-top:8px; padding:12px; border:1.5p
 .settings-link:hover{background:var(--surface); color:var(--ink);}
 @media (max-width:620px){ .modes{gap:8px;} .mode{padding:12px 4px 10px;} }
 .email-help{margin-top:10px; padding:10px 12px; border-radius:10px; background:var(--teal-soft); color:var(--ink); font-size:.86rem; line-height:1.45;}
+/* email card */
+.email-card{margin-top:16px; display:grid; gap:12px;}
+.email-card h2{display:flex; align-items:center; gap:8px; font-size:1.05rem;}
+.email-card h2 svg{color:var(--teal);}
+.attach{display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:.9rem; font-weight:600; color:var(--muted);}
+.chk{display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 16px 0 12px; border-radius:999px; border:1.5px solid var(--line-2);
+  background:var(--surface); color:var(--ink); font-weight:700; cursor:pointer; user-select:none;}
+.chk input{width:20px; height:20px; accent-color:var(--teal); margin:0;}
+.chk:has(input:checked){border-color:var(--teal); background:var(--teal-soft); color:var(--teal-2);}
+.email-card .email-help{margin-top:0;}

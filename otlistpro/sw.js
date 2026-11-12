@@ -1,9 +1,10 @@
 /* OT List Pro service worker: keeps the app working offline.
    Bump CACHE whenever any app file changes, so installed copies pick up the new version. */
-const CACHE = "otlp-1.2.0";
+const CACHE = "otlp-1.3.0";
 const FILES = [
   "./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest",
   "./vendor/pdf.min.js", "./vendor/pdf.worker.min.js",
+  "./vendor/jspdf.umd.min.js", "./vendor/jspdf.plugin.autotable.min.js",
   "./icons/icon.svg", "./icons/icon-192.png", "./icons/icon-512.png",
   "./icons/icon-maskable-192.png", "./icons/icon-maskable-512.png", "./icons/apple-touch-icon.png",
 ];
