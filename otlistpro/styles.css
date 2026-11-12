@@ -305,3 +305,10 @@ textarea{width:100%; min-height:120px; margin-top:8px; padding:12px; border:1.5p
 .dlg p{margin-top:10px; font-size:.95rem; color:var(--ink);}
 .dlg-actions{display:grid; gap:8px; margin-top:18px;}
 .dlg-actions .btn{width:100%;}
+/* about this device */
+.devinfo-card{margin-top:16px;}
+.devinfo-card h2{font-size:.82rem; text-transform:uppercase; letter-spacing:.06em; color:var(--teal-2);}
+.devinfo{display:grid; margin-top:8px;}
+.devinfo div{display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-top:1px solid var(--line); font-size:.9rem;}
+.devinfo div:first-child{border-top:0;}
+.devinfo span{color:var(--muted);}

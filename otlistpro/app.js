@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -107,6 +107,7 @@ document.addEventListener("click", e=>{
 
 /* ============ home ============ */
 function renderHome(){
+  $("home-version").textContent = "Version " + APP_VERSION;
   const h = new Date().getHours();
   const part = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   $("greeting").textContent = settings.user ? `${part}, ${settings.user}` : part;
@@ -900,7 +901,24 @@ $("newlist").addEventListener("click", ()=>{
 
 /* ============ settings ============ */
 const SFIELDS = ["user","head1","head2","surgeons","team","prefix","sites","ward","status","session"];
-function renderSettings(){ SFIELDS.forEach(k=>{ $("s-"+k).value = settings[k]; }); $("version").textContent = "OT List Pro · version "+APP_VERSION; }
+function renderSettings(){
+  SFIELDS.forEach(k=>{ $("s-"+k).value = settings[k]; });
+  $("version").textContent = "OT List Pro · version "+APP_VERSION;
+  // what this device allows: helps when something behaves differently on one phone or computer
+  const yes = v=> v ? "Yes" : "No";
+  const ua = navigator.userAgent;
+  const browser = /SamsungBrowser/.test(ua) ? "Samsung Internet" : /Edg\//.test(ua) ? "Microsoft Edge" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Other";
+  const os = /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : /iPhone|iPad|Mac OS/.test(ua) ? "Apple" : /Linux/.test(ua) ? "Linux" : "Other";
+  const rows = [
+    ["App version", APP_VERSION],
+    ["Device", `${os} · ${browser}`],
+    ["Opened as installed app", yes(matchMedia("(display-mode: standalone)").matches)],
+    ["Can attach PDF to email", yes(canShareOne(new File([""],"x.pdf",{type:"application/pdf"})))],
+    ["Can attach Excel to email", yes(canShareOne(new File([""],"x.xlsx",{type:XLSX_MIME})))],
+    ["“Save as” window for files", yes(!!window.showSaveFilePicker)],
+  ];
+  $("devinfo").innerHTML = rows.map(([k,v])=>`<div><span>${k}</span><b>${esc(v)}</b></div>`).join("");
+}
 $("s-save").addEventListener("click", ()=>{
   SFIELDS.forEach(k=>{ settings[k] = $("s-"+k).value.trim(); });
   if(!siteList().length) settings.sites = DEFAULTS.sites;
@@ -929,13 +947,21 @@ window.addEventListener("appinstalled", ()=>{ $("installbtn").hidden = true; toa
 
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   navigator.serviceWorker.register("sw.js").then(reg=>{
-    const offer = w => toast("A new version of OT List Pro is ready.", "Update", ()=>w.postMessage("skipWaiting"));
+    // New version found: switch to it straight away, unless a list is being worked on (then ask, so nothing is lost).
+    const offer = w => {
+      if(!cases.length){ w.postMessage("skipWaiting"); return; }
+      toast("A new version of OT List Pro is ready. Updating clears the list on screen.", "Update now", ()=>w.postMessage("skipWaiting"));
+    };
     if(reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
     reg.addEventListener("updatefound", ()=>{
       const w = reg.installing;
       w && w.addEventListener("statechange", ()=>{ if(w.state==="installed" && navigator.serviceWorker.controller) offer(w); });
     });
-    setInterval(()=>reg.update().catch(()=>{}), 60*60*1000);
+    // look for a new version whenever the app is opened or brought back to the front
+    const check = ()=>reg.update().catch(()=>{});
+    check();
+    document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") check(); });
+    setInterval(check, 60*60*1000);
   }).catch(()=>{});
   let reloading = false;
   navigator.serviceWorker.addEventListener("controllerchange", ()=>{ if(reloading) return; reloading = true; cases = []; location.reload(); });
