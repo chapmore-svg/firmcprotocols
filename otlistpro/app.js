@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.6.2";
+const APP_VERSION = "1.6.3";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -804,7 +804,14 @@ $("pdfbtn").addEventListener("click", async ()=>{
 
 /* ---- email: hand the chosen files to the device's own email app ---- */
 // Browsers only let web apps pass some file types to other apps (PDF usually yes, Excel often no), so check each file.
-function canShareOne(f){ try{ return !!(navigator.canShare && navigator.canShare({files:[f]})); }catch(e){ return false; } }
+// Android browsers (Chrome, Edge, Samsung Internet) say Excel files can be shared, then refuse with
+// "NotAllowedError: Permission denied". So on Android, and anywhere that has refused it before, treat Excel as not shareable.
+function excelRefusedHere(){ try{ return localStorage.getItem("otlp.excelShareRefused")==="1"; }catch(_){ return false; } }
+function markExcelRefused(){ try{ localStorage.setItem("otlp.excelShareRefused","1"); }catch(_){} }
+function canShareOne(f){
+  if(f.name.endsWith(".xlsx") && (IS_ANDROID || excelRefusedHere())) return false;
+  try{ return !!(navigator.canShare && navigator.canShare({files:[f]})); }catch(e){ return false; }
+}
 
 /* a simple question box */
 function choose(title, html, options){
@@ -862,6 +869,12 @@ async function tryShare(files){
 async function shareFiles(files){
   let r = await tryShare(files);
   if(r==="shared" || r==="closed") return true;
+  // Refused with an Excel file included: that's the usual cause. Remember it and offer the other choices.
+  const xl = files.filter(f=>f.name.endsWith(".xlsx")), rest = files.filter(f=>!f.name.endsWith(".xlsx"));
+  if(r && r.name==="NotAllowedError" && xl.length && rest.length){
+    noteShareProblem(r); markExcelRefused();
+    return partialShare(rest, xl);
+  }
   // Often the menu just needs a fresh tap (e.g. after a Save window): ask once.
   const go = await choose("Open the share menu", "<p>Tap <b>Share</b>, then choose Gmail, Outlook, WhatsApp, Drive or another app.</p>",
     [{label:"Share", value:true, primary:true},{label:"Cancel", value:false, ghost:true}]);
@@ -888,6 +901,27 @@ function openInChrome(){
   location.href = `intent://${location.host}${location.pathname}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
 }
 
+// Some files can be shared and some can't: ask what to do. Each choice is a fresh tap, which the share menu needs.
+async function partialShare(ok, blocked){
+  const okNames = ok.map(kindOf).join(" and "), blockedNames = blocked.map(kindOf).join(" and ");
+  const choice = await choose(`The ${blockedNames} can't be shared from here`,
+    `<p>This device lets the app share the <b>${okNames}</b>, but not the <b>${blockedNames}</b>.</p><p>What would you like to do?</p>`,
+    [{label:`Share the ${okNames} only`, value:"ok", primary:true},
+     {label:`Save the ${blockedNames}, then share`, value:"save"},
+     {label:"Cancel", value:null, ghost:true}]);
+  if(!choice) return true;
+  if(choice==="save"){
+    const how = await saveFiles(blocked);
+    if(how==="cancelled") return true;
+    const go = await choose(`${blockedNames.charAt(0).toUpperCase()+blockedNames.slice(1)} saved`,
+      `<p>${how==="downloaded" ? `It's in your <b>Downloads</b> folder.${IS_ANDROID ? " "+ANDROID_SAVE_TIP : ""}` : "It's in the folder you chose."}</p>`+
+      `<p>Next, the share menu opens with the <b>${okNames}</b>. If you choose email, add the saved <b>${blockedNames}</b> with the paper-clip button.</p>`,
+      [{label:"Share", value:true, primary:true},{label:"Cancel", value:false, ghost:true}]);
+    if(!go) return true;
+  }
+  return shareFiles(ok);
+}
+
 $("emailbtn").addEventListener("click", async ()=>{
   const wantX = $("att-xlsx").checked, wantP = $("att-pdf").checked;
   if(!wantX && !wantP){ toast("Tick Excel, PDF or both to include."); return; }
@@ -902,26 +936,7 @@ $("emailbtn").addEventListener("click", async ()=>{
   const blockedNames = blocked.map(kindOf).join(" and ");
 
   // 2. Some files can be shared (usually the PDF) and some can't (usually Excel): ask.
-  if(ok.length){
-    const okNames = ok.map(kindOf).join(" and ");
-    const choice = await choose(`The ${blockedNames} can't be shared from here`,
-      `<p>This device lets the app share the <b>${okNames}</b>, but not the <b>${blockedNames}</b>.</p><p>What would you like to do?</p>`,
-      [{label:`Share the ${okNames} only`, value:"ok", primary:true},
-       {label:`Save the ${blockedNames}, then share`, value:"save"},
-       {label:"Cancel", value:null, ghost:true}]);
-    if(!choice) return;
-    if(choice==="save"){
-      const how = await saveFiles(blocked);
-      if(how==="cancelled") return;
-      const go = await choose(`${blockedNames.charAt(0).toUpperCase()+blockedNames.slice(1)} saved`,
-        `<p>${how==="downloaded" ? `It's in your <b>Downloads</b> folder.${IS_ANDROID ? " "+ANDROID_SAVE_TIP : ""}` : "It's in the folder you chose."}</p>`+
-        `<p>Next, the share menu opens with the <b>${okNames}</b>. If you choose email, add the saved <b>${blockedNames}</b> with the paper-clip button.</p>`,
-        [{label:"Share", value:true, primary:true},{label:"Cancel", value:false, ghost:true}]);
-      if(!go) return;
-    }
-    await shareFiles(ok);
-    return;
-  }
+  if(ok.length){ await partialShare(ok, blocked); return; }
 
   // 3. This browser can't open the share menu with files at all.
   if(IS_ANDROID && !IS_ANDROID_CHROME){
