@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -514,9 +514,12 @@ function renderExport(){
   requestAnimationFrame(fitPreview);
   $("att-xlsx").checked = settings.attachXlsx==="1";
   $("att-pdf").checked = settings.attachPdf==="1";
-  $("email-help").innerHTML = canShareFiles()
+  const shX = canShareOne(new File([""],"x.xlsx",{type:XLSX_MIME})), shP = canShareOne(new File([""],"x.pdf",{type:"application/pdf"}));
+  $("email-help").innerHTML = (shX && shP)
     ? "Tap <b>Email the list</b>, then choose <b>Gmail</b> or <b>Outlook</b>. It opens with the ticked files attached and the subject and message filled in. Choose who it goes to, then tap Send."
-    : "Tap <b>Email the list</b>: the ticked files download and a new email opens with the subject and message filled in. <b>Attach the downloaded files</b>, choose who it goes to, then send.";
+    : shP
+    ? "On this device the <b>PDF</b> is attached to the email automatically. The <b>Excel</b> file can't be, so if it's ticked the app will ask what you'd like to do. Nothing is downloaded unless you choose to save it."
+    : "This browser can't attach files to an email by itself. When you tap <b>Email the list</b>, the app offers to save the files to a folder you choose and then opens a new email, ready for you to attach them.";
 }
 // shrink the full-width hospital list so the whole page is visible in the preview
 function fitPreview(){
@@ -690,10 +693,46 @@ function downloadBlob(blob, name){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
 }
-$("xlsxbtn").addEventListener("click", ()=>{
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+const ANDROID_SAVE_TIP = "To choose where files go, turn on “Ask where to save files” in Chrome: ⋮ → Settings → Downloads.";
+function pickerTypes(name){
+  return name.endsWith(".pdf")
+    ? [{description:"PDF document", accept:{"application/pdf":[".pdf"]}}]
+    : [{description:"Excel workbook", accept:{[XLSX_MIME]:[".xlsx"]}}];
+}
+// Save one file. Computers (Chrome/Edge): a "Save as" window to choose folder and name.
+// Elsewhere (e.g. Android): a normal download, which Chrome can be set to ask about.
+async function saveBlob(blob, name){
+  if(window.showSaveFilePicker){
+    try{
+      const h = await window.showSaveFilePicker({suggestedName:name, types:pickerTypes(name), id:"otlp-save", startIn:"documents"});
+      const w = await h.createWritable(); await w.write(blob); await w.close();
+      return "saved";
+    }catch(e){ if(e.name==="AbortError") return "cancelled"; }
+  }
+  downloadBlob(blob, name);
+  return "downloaded";
+}
+// Save several files: choose one folder for all of them where the browser allows it.
+async function saveFiles(files){
+  if(files.length===1) return saveBlob(files[0], files[0].name);
+  if(window.showDirectoryPicker){
+    try{
+      const dir = await window.showDirectoryPicker({mode:"readwrite", id:"otlp-save", startIn:"documents"});
+      for(const f of files){ const h = await dir.getFileHandle(f.name, {create:true}); const w = await h.createWritable(); await w.write(f); await w.close(); }
+      return "saved";
+    }catch(e){ if(e.name==="AbortError") return "cancelled"; }
+  }
+  files.forEach((f,i)=>setTimeout(()=>downloadBlob(f, f.name), i*350));
+  return "downloaded";
+}
+function savedToast(what, how){
+  if(how==="saved") toast(`${what} saved`);
+  else if(how==="downloaded") toast(`${what} saved to your Downloads folder.` + (IS_ANDROID ? " " + ANDROID_SAVE_TIP : ""), null, null, IS_ANDROID ? 7000 : 3200);
+}
+$("xlsxbtn").addEventListener("click", async ()=>{
   const blob = buildXlsx(); if(!blob) return;
-  downloadBlob(blob, fileName("xlsx"));
-  toast("Excel file downloaded");
+  savedToast("Excel file", await saveBlob(blob, fileName("xlsx")));
 });
 
 /* ---- PDF of the hospital list (jsPDF + AutoTable, bundled for offline use) ---- */
@@ -752,18 +791,32 @@ function buildPdf(){
   doc.setProperties({title: fileName("pdf").replace(/\.pdf$/,""), subject:"Operating theatre list", creator:"OT List Pro"});
   return doc.output("blob");
 }
-$("pdfbtn").addEventListener("click", ()=>{
+$("pdfbtn").addEventListener("click", async ()=>{
   const blob = buildPdf(); if(!blob) return;
-  downloadBlob(blob, fileName("pdf"));
-  toast("PDF downloaded");
+  savedToast("PDF", await saveBlob(blob, fileName("pdf")));
 });
 
 /* ---- email: hand the chosen files to the device's own email app ---- */
-function canShareFiles(files){
-  try{
-    files = files || [new File([""],"x.xlsx",{type:XLSX_MIME}), new File([""],"x.pdf",{type:"application/pdf"})];
-    return !!(navigator.canShare && navigator.canShare({files}));
-  }catch(e){ return false; }
+// Browsers only let web apps pass some file types to other apps (PDF usually yes, Excel often no), so check each file.
+function canShareOne(f){ try{ return !!(navigator.canShare && navigator.canShare({files:[f]})); }catch(e){ return false; } }
+
+/* a simple question box */
+function choose(title, html, options){
+  return new Promise(resolve=>{
+    const d = $("dlg"); let done = false;
+    const finish = v=>{ if(done) return; done = true; if(d.open) d.close(); resolve(v); };
+    $("dlg-title").textContent = title; $("dlg-body").innerHTML = html;
+    const box = $("dlg-actions"); box.innerHTML = "";
+    options.forEach(o=>{
+      const b = document.createElement("button");
+      b.className = "btn tap " + (o.primary ? "btn-primary" : o.ghost ? "btn-ghost" : "btn-secondary");
+      b.textContent = o.label; b.onclick = ()=>finish(o.value);
+      box.appendChild(b);
+    });
+    // Esc / back button = cancel. (Not the "close" event: it arrives late and would shut the next box.)
+    d.oncancel = e=>{ e.preventDefault(); finish(null); };
+    d.showModal();
+  });
 }
 function emailSubject(){
   const b = dateBits();
@@ -780,20 +833,64 @@ function emailBody(){
   settings.attachPdf  = $("att-pdf").checked ? "1" : "0";
   saveSettings(settings);
 }));
+async function shareFiles(files){
+  try{ await navigator.share({files, title:emailSubject(), text:emailBody()}); return true; }
+  catch(e){
+    if(e.name==="AbortError") return true;   // closed the menu: nothing more to do
+    // the menu may need a fresh tap (e.g. after a Save window); ask once more
+    const go = await choose("Open your email", "<p>Tap <b>Open email</b> and choose Gmail or Outlook.</p>",
+      [{label:"Open email", value:true, primary:true},{label:"Cancel", value:false, ghost:true}]);
+    if(!go) return true;
+    try{ await navigator.share({files, title:emailSubject(), text:emailBody()}); }catch(_){}
+    return true;
+  }
+}
+const kindOf = f=> f.name.endsWith(".pdf") ? "PDF" : "Excel file";
 $("emailbtn").addEventListener("click", async ()=>{
   const wantX = $("att-xlsx").checked, wantP = $("att-pdf").checked;
   if(!wantX && !wantP){ toast("Tick Excel, PDF or both to attach."); return; }
   const files = [];
   if(wantX){ const blob = buildXlsx(); if(!blob) return; files.push(new File([blob], fileName("xlsx"), {type:XLSX_MIME})); }
   if(wantP){ const blob = buildPdf();  if(!blob) return; files.push(new File([blob], fileName("pdf"),  {type:"application/pdf"})); }
-  if(canShareFiles(files)){
-    try{ await navigator.share({files, title:emailSubject(), text:emailBody()}); return; }
-    catch(e){ if(e.name==="AbortError") return; }
+  const ok = files.filter(canShareOne), blocked = files.filter(f=>!canShareOne(f));
+
+  // 1. Everything can be attached: open the email menu straight away.
+  if(!blocked.length){ await shareFiles(files); return; }
+
+  const mailto = ()=>{ location.href = `mailto:?subject=${encodeURIComponent(emailSubject())}&body=${encodeURIComponent(emailBody())}`; };
+  const blockedNames = blocked.map(kindOf).join(" and ");
+
+  // 2. Some can be attached (usually the PDF) and some can't (usually Excel): ask.
+  if(ok.length){
+    const okNames = ok.map(kindOf).join(" and ");
+    const choice = await choose(`The ${blockedNames} can't be attached here`,
+      `<p>This device lets the app attach the <b>${okNames}</b> to an email, but not the <b>${blockedNames}</b>.</p><p>What would you like to do?</p>`,
+      [{label:`Email with the ${okNames} only`, value:"ok", primary:true},
+       {label:`Save the ${blockedNames} first, then email`, value:"save"},
+       {label:"Cancel", value:null, ghost:true}]);
+    if(!choice) return;
+    if(choice==="save"){
+      const how = await saveFiles(blocked);
+      if(how==="cancelled") return;
+      const go = await choose(`${blockedNames.charAt(0).toUpperCase()+blockedNames.slice(1)} saved`,
+        `<p>${how==="downloaded" ? `It's in your <b>Downloads</b> folder.${IS_ANDROID ? " "+ANDROID_SAVE_TIP : ""}` : "It's in the folder you chose."}</p>`+
+        `<p>Next, your email opens with the <b>${okNames}</b> attached. Add the saved <b>${blockedNames}</b> to it as well, using the paper-clip button.</p>`,
+        [{label:"Open email", value:true, primary:true},{label:"Cancel", value:false, ghost:true}]);
+      if(!go) return;
+    }
+    await shareFiles(ok);
+    return;
   }
-  // No share menu on this device: download the files, then open a new email with subject and message filled in.
-  files.forEach((f,i)=>setTimeout(()=>downloadBlob(f, f.name), i*350));
-  setTimeout(()=>{ location.href = `mailto:?subject=${encodeURIComponent(emailSubject())}&body=${encodeURIComponent(emailBody())}`; }, 400 + files.length*350);
-  toast(`${files.length===2?"Excel and PDF":wantX?"Excel file":"PDF"} downloaded. Attach ${files.length===2?"them":"it"} to the email that opens.`, null, null, 6000);
+
+  // 3. Nothing can be attached by this browser: offer to save, then open a blank email.
+  const choice = await choose("Attach the files yourself",
+    `<p>This browser can't attach files to an email by itself.</p><p>The app can save the <b>${blockedNames}</b> to a folder you choose, then open a new email with the subject and message filled in, ready for you to attach them.</p>`,
+    [{label:"Save files and open email", value:true, primary:true},{label:"Cancel", value:null, ghost:true}]);
+  if(!choice) return;
+  const how = await saveFiles(files);
+  if(how==="cancelled") return;
+  mailto();
+  toast(`Saved. Attach the ${blockedNames} to the new email with the paper-clip button.`, null, null, 7000);
 });
 $("newlist").addEventListener("click", ()=>{
   cases = []; sourceText = ""; $("pastebox").value = ""; $("listdate").value = ""; $("session").value = settings.session;
