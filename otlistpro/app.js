@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.6.1";
+const APP_VERSION = "1.6.2";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -839,17 +839,42 @@ function emailBody(){
   settings.attachPdf  = $("att-pdf").checked ? "1" : "0";
   saveSettings(settings);
 }));
-async function shareFiles(files){
-  try{ await navigator.share({files, title:emailSubject(), text:emailBody()}); return true; }
-  catch(e){
-    if(e.name==="AbortError") return true;   // closed the menu: nothing more to do
-    // the menu may need a fresh tap (e.g. after a Save window); ask once more
-    const go = await choose("Open the share menu", "<p>Tap <b>Share</b>, then choose Gmail, Outlook, WhatsApp, Drive or another app.</p>",
-      [{label:"Share", value:true, primary:true},{label:"Cancel", value:false, ghost:true}]);
-    if(!go) return true;
-    try{ await navigator.share({files, title:emailSubject(), text:emailBody()}); }catch(_){}
-    return true;
+// Remember the last sharing problem so it can be shown in Settings → About this device.
+function noteShareProblem(e){
+  const msg = `${e && e.name || "Error"}: ${e && e.message || "no details"}`;
+  try{ localStorage.setItem("otlp.lastShareError", new Date().toLocaleString()+" · "+msg); }catch(_){}
+  return msg;
+}
+// Try the share menu: first with subject and message, then with the files alone
+// (some devices refuse files + text together). Returns "shared", "closed" or the error.
+async function tryShare(files){
+  let last;
+  for(const data of [{files, title:emailSubject(), text:emailBody()}, {files}]){
+    try{ await navigator.share(data); return "shared"; }
+    catch(e){
+      if(e.name==="AbortError") return "closed";   // the person closed the menu
+      last = e;
+      if(e.name==="NotAllowedError") break;        // needs a fresh tap; retrying now won't help
+    }
   }
+  return last;
+}
+async function shareFiles(files){
+  let r = await tryShare(files);
+  if(r==="shared" || r==="closed") return true;
+  // Often the menu just needs a fresh tap (e.g. after a Save window): ask once.
+  const go = await choose("Open the share menu", "<p>Tap <b>Share</b>, then choose Gmail, Outlook, WhatsApp, Drive or another app.</p>",
+    [{label:"Share", value:true, primary:true},{label:"Cancel", value:false, ghost:true}]);
+  if(!go) return true;
+  r = await tryShare(files);
+  if(r==="shared" || r==="closed") return true;
+  const msg = noteShareProblem(r);
+  const next = await choose("The share menu didn't open",
+    `<p>This device refused to open the share menu.</p><p class="errline">Reason given: <code>${esc(msg)}</code></p>`+
+    `<p>You can save the files instead and send them yourself. Please also tell your app supplier the reason above.</p>`,
+    [{label:"Save the files instead", value:"save", primary:true},{label:"Close", value:null, ghost:true}]);
+  if(next==="save") savedToast(files.map(kindOf).join(" and ").replace(/^./,c=>c.toUpperCase()), await saveFiles(files));
+  return true;
 }
 const kindOf = f=> f.name.endsWith(".pdf") ? "PDF" : "Excel file";
 const UA = navigator.userAgent;
@@ -925,7 +950,7 @@ $("emailbtn").addEventListener("click", async ()=>{
 });
 
 /* ============ check for updates ============ */
-let swReg = null, applyUpdate = null;
+let swReg = null, applyUpdate = null, updateRequested = false;
 async function checkForUpdates(){
   if(!swReg){ toast("Updates can be checked once the app has been opened from its web link."); return; }
   if(!navigator.onLine){ toast("You're offline. Connect to the internet, then check again."); return; }
@@ -965,6 +990,8 @@ function renderSettings(){
     ["Can attach PDF to email", yes(canShareOne(new File([""],"x.pdf",{type:"application/pdf"})))],
     ["Can attach Excel to email", yes(canShareOne(new File([""],"x.xlsx",{type:XLSX_MIME})))],
     ["“Save as” window for files", yes(!!window.showSaveFilePicker)],
+    ["Share menu available", yes(!!navigator.share)],
+    ["Last share problem", (()=>{ try{ return localStorage.getItem("otlp.lastShareError") || "None"; }catch(_){ return "None"; } })()],
   ];
   $("devinfo").innerHTML = rows.map(([k,v])=>`<div><span>${k}</span><b>${esc(v)}</b></div>`).join("");
 }
@@ -976,6 +1003,14 @@ $("s-save").addEventListener("click", ()=>{
   $("session").value = settings.session;
   toast("Settings saved");
   go(lastScreen);
+});
+$("sharetest").addEventListener("click", async ()=>{
+  if(!navigator.share){ toast("This browser has no share menu at all.", null, null, 6000); return; }
+  try{ await navigator.share({title:"OT List Pro", text:"Share menu test from OT List Pro"}); toast("The share menu works on this device."); }
+  catch(e){
+    if(e.name==="AbortError"){ toast("The share menu opened. You closed it, which is fine."); return; }
+    toast("The share menu didn't open: "+noteShareProblem(e), null, null, 8000); renderSettings();
+  }
 });
 $("s-reset").addEventListener("click", ()=>{
   if(!confirm("Reset all settings to the original Firm C values?")) return;
@@ -998,9 +1033,10 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   navigator.serviceWorker.register("sw.js").then(reg=>{
     // New version found: switch to it straight away, unless a list is being worked on (then ask, so nothing is lost).
     swReg = reg;
+    const switchTo = w=>{ updateRequested = true; w.postMessage("skipWaiting"); };
     const offer = applyUpdate = (w, asked) => {
-      if(!cases.length){ w.postMessage("skipWaiting"); return; }
-      toast("A new version of OT List Pro is ready. Updating clears the list on screen.", "Update now", ()=>w.postMessage("skipWaiting"));
+      if(!cases.length){ switchTo(w); return; }
+      toast("A new version of OT List Pro is ready. Updating clears the list on screen.", "Update now", ()=>switchTo(w));
     };
     if(reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
     reg.addEventListener("updatefound", ()=>{
@@ -1013,8 +1049,13 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
     document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") check(); });
     setInterval(check, 60*60*1000);
   }).catch(()=>{});
+  // Reload only when this app has just switched to a NEW version. On the very first visit the offline
+  // worker also "takes over", and reloading then would wipe a list the person has already started.
   let reloading = false;
-  navigator.serviceWorker.addEventListener("controllerchange", ()=>{ if(reloading) return; reloading = true; cases = []; location.reload(); });
+  navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+    if(!updateRequested || reloading) return;
+    reloading = true; cases = []; location.reload();
+  });
 }
 
 /* ============ start ============ */

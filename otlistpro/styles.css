@@ -319,3 +319,5 @@ textarea{width:100%; min-height:120px; margin-top:8px; padding:12px; border:1.5p
 .linkbtn{color:var(--teal-2); font-weight:700; padding:6px 4px; border-radius:8px;}
 .home-ver{display:flex; justify-content:center; align-items:center; gap:4px;}
 .pick-help{margin-top:10px; font-size:.88rem; color:var(--muted); text-align:center;}
+.errline code{font-family:ui-monospace,Consolas,monospace; font-size:.82rem; background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:1px 5px; word-break:break-word;}
+.devinfo b{text-align:right; word-break:break-word;}
