@@ -29,7 +29,7 @@
 </header>
 
 <nav class="stepper" id="stepper" aria-label="Progress" hidden>
-  <button class="step tap" data-go="upload"><i>1</i><span>Upload</span></button>
+  <button class="step tap" data-go="upload"><i>1</i><span>Enter list</span></button>
   <span class="step-line"></span>
   <button class="step tap" data-go="review"><i>2</i><span>Review</span></button>
   <span class="step-line"></span>
@@ -53,27 +53,30 @@
     </div>
 
     <div class="tiles">
-      <button class="tile tap" data-go="upload">
+      <button class="tile tap" data-start="pdf">
         <span class="tile-ico t-blue"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
-        <b>From calendar PDF</b>
-        <small>Upload the Google Calendar day printout</small>
+        <b>Upload a PDF</b>
+        <small>The Google Calendar day printout</small>
       </button>
-      <button class="tile tap" id="tile-paste">
-        <span class="tile-ico t-teal"><svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/></svg></span>
-        <b>Paste text</b>
-        <small>Copy the printout text if you have no PDF</small>
+      <button class="tile tap" data-start="word">
+        <span class="tile-ico t-word"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8.5 12l1.5 6 2-4.5 2 4.5 1.5-6"/></svg></span>
+        <b>Upload a Word document</b>
+        <small>A .docx file with the bookings</small>
       </button>
-      <button class="tile tap" data-go="settings">
-        <span class="tile-ico t-slate"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></span>
-        <b>Settings</b>
-        <small>Hospital, team, surgeons and sites</small>
+      <button class="tile tap" data-start="type">
+        <span class="tile-ico t-teal"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></span>
+        <b>Type it in</b>
+        <small>Type or paste the bookings</small>
       </button>
     </div>
+    <button class="settings-link tap" data-go="settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+      Settings: hospital, team, surgeons and sites</button>
 
     <div class="howto card">
       <h2>How it works</h2>
       <ol>
-        <li><b>Upload</b> the calendar printout. Each booking becomes a case, in theatre order.</li>
+        <li><b>Enter the list</b> in one of three ways: upload the calendar <b>PDF</b>, upload a <b>Word</b> document, or <b>type</b> it in. Each booking becomes a case, in theatre order.</li>
         <li><b>Review</b> the cases. Amber <span class="chip chip-check">Check</span> marks are values the app worked out for you.</li>
         <li><b>Export</b> the hospital list as Excel, or print it.</li>
       </ol>
@@ -86,19 +89,68 @@
 
   <!-- ============ UPLOAD ============ -->
   <section class="screen" id="screen-upload" hidden>
-    <h1 class="screen-title">Upload the calendar</h1>
-    <p class="screen-sub">Use the Google Calendar <b>day view</b> printout (PDF).</p>
+    <h1 class="screen-title">Enter the OT list</h1>
+    <p class="screen-sub">Choose <b>one</b> of the three ways below.</p>
 
-    <div class="drop tap-soft" id="drop" tabindex="0" role="button" aria-label="Choose the calendar PDF">
-      <div class="drop-ico"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5l5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div>
-      <b id="drop-title">Tap to choose the PDF</b>
-      <small id="drop-sub">or drag it here</small>
-      <input type="file" id="file" accept="application/pdf,.pdf" hidden>
+    <div class="modes" role="tablist" aria-label="How to enter the list">
+      <button class="mode tap" role="tab" data-mode="pdf" id="mode-pdf">
+        <span class="mode-ico t-blue"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></span>
+        <b>PDF</b><small>Calendar printout</small></button>
+      <button class="mode tap" role="tab" data-mode="word" id="mode-word">
+        <span class="mode-ico t-word"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8.5 12l1.5 6 2-4.5 2 4.5 1.5-6"/></svg></span>
+        <b>Word</b><small>.docx document</small></button>
+      <button class="mode tap" role="tab" data-mode="type" id="mode-type">
+        <span class="mode-ico t-teal"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></span>
+        <b>Type</b><small>Type or paste</small></button>
     </div>
 
-    <details class="paste" id="paste-details">
-      <summary class="tap-soft">No PDF? Paste the printout text instead</summary>
-      <textarea id="pastebox" placeholder="Open the printout, select all, copy, and paste here…"></textarea>
+    <!-- PDF / Word: file chooser -->
+    <div id="panel-file" class="panel">
+      <ol class="steps-help" id="help-pdf">
+        <li>In Google Calendar, open the theatre day in <b>Day</b> view.</li>
+        <li>Print it and choose <b>Save as PDF</b>.</li>
+        <li>Tap the box below and choose that PDF.</li>
+      </ol>
+      <ol class="steps-help" id="help-word" hidden>
+        <li>Write the list in Word, laid out as in the example below.</li>
+        <li>Save it as a <b>.docx</b> file. For an older <b>.doc</b> file, open it in Word and use <b>Save As → Word Document (.docx)</b>.</li>
+        <li>Tap the box below and choose that file.</li>
+      </ol>
+      <div class="drop tap-soft" id="drop" tabindex="0" role="button" aria-label="Choose the file">
+        <div class="drop-ico"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5l5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div>
+        <b id="drop-title">Tap to choose the PDF</b>
+        <small id="drop-sub">or drag it here</small>
+        <input type="file" id="file" hidden>
+      </div>
+    </div>
+
+    <!-- Type: text box -->
+    <div id="panel-type" class="panel" hidden>
+      <p class="type-help">Type each booking as shown in the example below, or paste text copied from another document or message.</p>
+      <textarea id="pastebox" rows="9" placeholder="Mary Brown 45/F Ex bx lipoma back LA Reg # 123456&#10;8am - 9am&#10;&#10;Ann White 38/F Lap chole GA Reg # 445566&#10;9:30am - 11:30am"></textarea>
+    </div>
+
+    <details class="format card" id="format-help">
+      <summary class="tap-soft"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+        How each booking must be written</summary>
+      <p>Each booking needs these, in this order:</p>
+      <ol>
+        <li><b>Patient name</b></li>
+        <li><b>Age/Sex</b>, e.g. <code>45/F</code> or <code>70 M</code>. <i>This is required: entries without it are skipped.</i></li>
+        <li><b>Procedure</b>, e.g. <code>Lap chole</code>, <code>Ex bx lipoma back</code>, <code>RIH mesh repair</code></li>
+        <li><b>Anaesthesia</b> (optional): <code>LA</code>, <code>GA</code> or <code>LA/Sed</code></li>
+        <li><b>Reg #</b>, e.g. <code>Reg # 123456</code>, or <code>Reg # NYR</code> if not yet registered</li>
+        <li><b>Time slot</b>, e.g. <code>8am - 9am</code> or <code>9:30am to 11:30am</code>, on the next line or at the start of the line. The slot length becomes EST (MIN).</li>
+      </ol>
+      <p class="ex-title">Example</p>
+<pre class="example">Mary Brown 45/F Ex bx lipoma back LA Reg # 123456
+8am - 9am
+Ann White 38/F Lap chole GA Reg # 445566
+9:30am - 11:30am</pre>
+      <p class="ex-title">This also works</p>
+<pre class="example">8am - 9am  Mary Brown 45/F Ex bx lipoma back LA Reg # 123456
+9:30am - 11:30am  Ann White 38/F Lap chole GA Reg # 445566</pre>
+      <p>Put the date (e.g. <code>Tue Nov 17, 2026</code>) and site (e.g. <code>FAL OT</code>) anywhere in the text and they're filled in for you. Otherwise set them below.</p>
     </details>
 
     <div class="card form-grid">

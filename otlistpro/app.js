@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.0.1";
+const APP_VERSION = "1.1.0";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -110,53 +110,162 @@ function renderHome(){
   $("greeting").textContent = settings.user ? `${part}, ${settings.user}` : part;
   $("hero-team").textContent = settings.team;
 }
-$("tile-paste").addEventListener("click", ()=>{ go("upload"); $("paste-details").open = true; setTimeout(()=>$("pastebox").focus(), 300); });
+document.querySelectorAll("[data-start]").forEach(b=>b.addEventListener("click", ()=>{ setMode(b.dataset.start); go("upload"); }));
 
-/* ============ upload ============ */
+/* ============ upload: three ways to enter the list ============ */
+let inputMode = "pdf";      // "pdf" | "word" | "type"
+let fileText = "";          // text read from the chosen PDF / Word file
+const MODE_TEXT = {
+  pdf:  {title:"Tap to choose the PDF",  accept:"application/pdf,.pdf"},
+  word: {title:"Tap to choose the Word document", accept:".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+};
+function setMode(m){
+  inputMode = m;
+  document.querySelectorAll(".mode").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.mode===m)));
+  $("panel-file").hidden = (m==="type");
+  $("panel-type").hidden = (m!=="type");
+  $("help-pdf").hidden = (m!=="pdf");
+  $("help-word").hidden = (m!=="word");
+  if(m!=="type"){
+    $("file").accept = MODE_TEXT[m].accept;
+    if(!drop.classList.contains("loaded") || drop.dataset.kind!==m) resetDrop();
+  }
+  // the format rules matter most when typing or using Word
+  $("format-help").open = (m!=="pdf");
+  setMsg("");
+}
+document.querySelectorAll(".mode").forEach(b=>b.addEventListener("click", ()=>{
+  setMode(b.dataset.mode);
+  if(b.dataset.mode==="type") setTimeout(()=>$("pastebox").focus(), 50);
+}));
+function resetDrop(){
+  drop.classList.remove("loaded"); delete drop.dataset.kind; fileText = "";
+  $("drop-title").textContent = MODE_TEXT[inputMode==="word"?"word":"pdf"].title;
+  $("drop-sub").textContent = "or drag it here";
+}
+
 function renderUpload(){
   const sel = $("site"), cur = sel.value;
   sel.innerHTML = siteList().map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
   if(cur && [...sel.options].some(o=>o.value===cur)) sel.value = cur;
   if(!$("session").value) $("session").value = settings.session;
+  setMode(inputMode);
 }
 const drop = $("drop"), fileInput = $("file");
 drop.addEventListener("click", ()=>fileInput.click());
 drop.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fileInput.click(); } });
 ["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add("drag"); }));
 ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove("drag"); }));
-drop.addEventListener("drop", e=>{ const f=e.dataTransfer.files[0]; if(f) readPdf(f); });
-fileInput.addEventListener("change", ()=>{ if(fileInput.files[0]) readPdf(fileInput.files[0]); fileInput.value=""; });
+drop.addEventListener("drop", e=>{ const f=e.dataTransfer.files[0]; if(f) readFile(f); });
+fileInput.addEventListener("change", ()=>{ if(fileInput.files[0]) readFile(fileInput.files[0]); fileInput.value=""; });
 
 function setMsg(text, kind){ const m=$("srcmsg"); m.textContent=text; m.className="msg"+(kind?" "+kind:""); }
 
-async function readPdf(f){
+async function readFile(f){
+  const name = f.name.toLowerCase();
+  const isPdf = name.endsWith(".pdf") || f.type==="application/pdf";
+  const isDocx = name.endsWith(".docx") || f.type.includes("wordprocessingml");
+  if(name.endsWith(".doc")){
+    setMsg("That is an older Word file (.doc). Open it in Word, choose Save As → Word Document (.docx), then choose the new file.", "err"); return;
+  }
+  if(!isPdf && !isDocx){ setMsg("Please choose a PDF (.pdf) or Word (.docx) file.", "err"); return; }
+  const kind = isPdf ? "pdf" : "word";
+  if(kind !== inputMode) setMode(kind);
   setMsg("Reading "+f.name+" …");
   try{
-    if(!window.pdfjsLib) throw new Error("reader");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js";
-    const pdf = await pdfjsLib.getDocument({data: await f.arrayBuffer()}).promise;
-    let text = "";
-    for(let p=1; p<=pdf.numPages; p++){
-      const tc = await (await pdf.getPage(p)).getTextContent();
-      let lastY = null;
-      tc.items.forEach(it=>{
-        if(lastY!==null && Math.abs(it.transform[5]-lastY) > 3) text += "\n";
-        text += it.str + " ";
-        lastY = it.transform[5];
-      });
-      text += "\n";
-    }
-    sourceText = text.trim();
-    $("pastebox").value = sourceText;
-    drop.classList.add("loaded");
+    const res = isPdf ? await pdfToText(f) : {text: await docxToText(await f.arrayBuffer()), pages:0};
+    fileText = res.text.trim();
+    if(!fileText) throw new Error("empty");
+    drop.classList.add("loaded"); drop.dataset.kind = kind;
     $("drop-title").textContent = f.name;
-    $("drop-sub").textContent = `${pdf.numPages} page${pdf.numPages>1?"s":""} read · tap to choose another`;
-    detectMeta(sourceText);
-    setMsg("PDF read. Check the date and site, then tap Read cases.", "ok");
+    $("drop-sub").textContent = (isPdf ? `${res.pages} page${res.pages>1?"s":""} read` : "Document read") + " · tap to choose another";
+    detectMeta(fileText);
+    setMsg((isPdf?"PDF":"Word document")+" read. Check the date and site, then tap Read cases.", "ok");
   }catch(err){
-    setMsg("Couldn't read that PDF. Paste the printout text instead (below the upload box).", "err");
-    $("paste-details").open = true;
+    fileText = "";
+    setMsg(`Couldn't read that ${isPdf?"PDF":"Word document"}. Choose Type instead and paste the list.`, "err");
   }
+}
+
+async function pdfToText(f){
+  if(!window.pdfjsLib) throw new Error("reader");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js";
+  const pdf = await pdfjsLib.getDocument({data: await f.arrayBuffer()}).promise;
+  let text = "";
+  for(let p=1; p<=pdf.numPages; p++){
+    const tc = await (await pdf.getPage(p)).getTextContent();
+    let lastY = null;
+    tc.items.forEach(it=>{
+      if(lastY!==null && Math.abs(it.transform[5]-lastY) > 3) text += "\n";
+      text += it.str + " ";
+      lastY = it.transform[5];
+    });
+    text += "\n";
+  }
+  return {text, pages:pdf.numPages};
+}
+
+// .docx is a zip; the text is in word/document.xml. Uses the browser's built-in decompression.
+async function docxToText(buf){
+  const u8 = new Uint8Array(buf), dv = new DataView(buf), dec = new TextDecoder();
+  let eocd = -1;
+  for(let i=u8.length-22; i>=Math.max(0,u8.length-65557); i--){ if(dv.getUint32(i,true)===0x06054b50){ eocd=i; break; } }
+  if(eocd<0) throw new Error("not a zip");
+  const count = dv.getUint16(eocd+10,true);
+  let p = dv.getUint32(eocd+16,true);
+  for(let k=0; k<count; k++){
+    if(dv.getUint32(p,true)!==0x02014b50) break;
+    const method=dv.getUint16(p+10,true), csize=dv.getUint32(p+20,true);
+    const nlen=dv.getUint16(p+28,true), xlen=dv.getUint16(p+30,true), clen=dv.getUint16(p+32,true), off=dv.getUint32(p+42,true);
+    const name = dec.decode(u8.subarray(p+46, p+46+nlen));
+    if(name==="word/document.xml"){
+      const start = off+30+dv.getUint16(off+26,true)+dv.getUint16(off+28,true);
+      const data = u8.subarray(start, start+csize);
+      let xml;
+      if(method===0) xml = dec.decode(data);
+      else if(method===8) xml = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+      else throw new Error("compression");
+      return wordXmlToText(xml);
+    }
+    p += 46+nlen+xlen+clen;
+  }
+  throw new Error("no document.xml");
+}
+function wordXmlToText(xml){
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const paraText = para=>{
+    let line = "";
+    const walk = n=>{
+      for(const c of n.children){
+        const ln = c.localName;
+        if(ln==="t") line += c.textContent;
+        else if(ln==="tab") line += " ";
+        else if(ln==="br" || ln==="cr") line += "\n";
+        else if(ln!=="p" && ln!=="instrText" && ln!=="delText") walk(c);
+      }
+    };
+    walk(para);
+    return line;
+  };
+  const lines = [];
+  const block = el=>{
+    for(const c of el.children){
+      if(c.localName==="p") lines.push(paraText(c));
+      else if(c.localName==="tbl"){
+        // one table row = one line, cells side by side
+        for(const tr of c.children){
+          if(tr.localName!=="tr") continue;
+          const cells = [...tr.children].filter(tc=>tc.localName==="tc")
+            .map(tc=>[...tc.getElementsByTagNameNS(W,"p")].map(paraText).join(" ").trim()).filter(Boolean);
+          lines.push(cells.join("  "));
+        }
+      }
+      else if(c.localName==="sdt"){ const sc = [...c.children].find(x=>x.localName==="sdtContent"); if(sc) block(sc); }
+    }
+  };
+  block(doc.getElementsByTagNameNS(W,"body")[0] || doc.documentElement);
+  return lines.join("\n");
 }
 
 /* ============ parser (same rules as the CRH Gen Sx C app, with the Nov 2026 fixes) ============ */
@@ -175,19 +284,37 @@ function detectMeta(raw){
   }
 }
 
+// A time slot: "8am - 9am", "9:30am to 11:30am", "8 – 9am" (start takes the end's am/pm when left out)
+const SLOT = String.raw`\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:[–—\-]|to)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b`;
+const HAS_AGE_SEX = /\d{1,3}\s*\/\s*[MF]\b|\d{1,3}\s*[MF]\b/i;
+function slotFrom(m, i){
+  const eap = m[i+5], e24 = to24(m[i+3], eap), em = +(m[i+4]||0), sm = +(m[i+1]||0);
+  let s24 = to24(m[i], m[i+2] || eap);
+  if(!m[i+2] && s24*60+sm > e24*60+em) s24 = to24(m[i], eap.toLowerCase()==="pm" ? "am" : "pm");
+  let dur = (e24*60+em) - (s24*60+sm);
+  if(dur <= 0) dur += 1440;
+  return {t:s24*60+sm, est:String(dur)};
+}
 function parseSource(raw){
-  const re = /([^\n]{6,}?)\s*\n?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*[–\-]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/gi;
-  const found = []; let mt;
-  while((mt = re.exec(raw)) !== null){
+  // Layout A (Google Calendar printout): booking text, then its time slot.
+  const a = []; let mt;
+  const reA = new RegExp(String.raw`([^\n]{6,}?)\s*\n?\s*` + SLOT, "gi");
+  while((mt = reA.exec(raw)) !== null){
     const chunk = mt[1].trim();
-    if(!/\d{1,3}\s*\/\s*[MF]\b|\d{1,3}\s*[MF]\b/i.test(chunk)) continue;   // must contain age/sex
-    const h24 = to24(mt[2], mt[4]), mm = +(mt[3]||0);
-    const e24 = to24(mt[5], mt[7]), em = +(mt[6]||0);
-    let dur = (e24*60+em) - (h24*60+mm);
-    if(dur <= 0) dur += 1440;
-    found.push({t:h24*60+mm, est:String(dur), text:chunk});
+    if(!HAS_AGE_SEX.test(chunk)) continue;   // must contain age/sex
+    a.push({...slotFrom(mt, 2), text:chunk});
   }
-  found.sort((a,b)=>a.t-b.t);
+  // Layout B (typed / Word tables): time slot at the start of a line, booking after it.
+  const b = [];
+  const reB = new RegExp(String.raw`(?:^|\n)[ \t]*` + SLOT + String.raw`[ \t]*[,:;|\-–]?[ \t]*\n?[ \t]*([^\n]{6,})`, "gi");
+  while((mt = reB.exec(raw)) !== null){
+    const chunk = mt[7].trim();
+    if(!HAS_AGE_SEX.test(chunk)) continue;
+    b.push({...slotFrom(mt, 1), text:chunk});
+    reB.lastIndex -= 1;   // let the next slot reuse the newline
+  }
+  const found = b.length > a.length ? b : a;
+  found.sort((x,y)=>x.t-y.t);
   return found.map(f=>parseEntry(f.text, f.est));
 }
 
@@ -253,12 +380,15 @@ function deriveDxProc(p){
 }
 
 $("parsebtn").addEventListener("click", ()=>{
-  const raw = $("pastebox").value;
-  if(!raw.trim()){ setMsg("Choose the calendar PDF first, or paste the printout text.", "err"); return; }
+  const raw = inputMode==="type" ? $("pastebox").value : fileText;
+  if(!raw.trim()){
+    setMsg(inputMode==="type" ? "Type or paste the list into the box first." : inputMode==="word" ? "Choose the Word document first." : "Choose the calendar PDF first.", "err");
+    return;
+  }
   if(raw !== sourceText) detectMeta(raw);
   sourceText = raw;
   const parsed = parseSource(raw);
-  if(!parsed.length){ setMsg("No patient bookings found. Each booking needs a name, age/sex (e.g. 45/F) and a time slot.", "err"); return; }
+  if(!parsed.length){ setMsg("No bookings found. Each booking needs a name, age/sex (e.g. 45/F) and a time slot (e.g. 8am - 9am). See “How each booking must be written” above.", "err"); $("format-help").open = true; return; }
   cases = parsed;
   if(!$("listdate").value){ setMsg(`${cases.length} cases found. Please set the list date.`, "err"); $("listdate").focus(); return; }
   setMsg("");
@@ -563,7 +693,7 @@ $("sharebtn").addEventListener("click", async ()=>{
 });
 $("newlist").addEventListener("click", ()=>{
   cases = []; sourceText = ""; $("pastebox").value = ""; $("listdate").value = ""; $("session").value = settings.session;
-  drop.classList.remove("loaded"); $("drop-title").textContent = "Tap to choose the PDF"; $("drop-sub").textContent = "or drag it here";
+  resetDrop();
   setMsg(""); go("upload");
 });
 
