@@ -312,3 +312,9 @@ textarea{width:100%; min-height:120px; margin-top:8px; padding:12px; border:1.5p
 .devinfo div{display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-top:1px solid var(--line); font-size:.9rem;}
 .devinfo div:first-child{border-top:0;}
 .devinfo span{color:var(--muted);}
+.share-sub{margin-top:-6px; color:var(--muted); font-size:.88rem;}
+.update-card{margin-top:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+.update-card h2{font-size:.82rem; text-transform:uppercase; letter-spacing:.06em; color:var(--teal-2);}
+.update-card p{color:var(--muted); font-size:.88rem; margin-top:4px;}
+.linkbtn{color:var(--teal-2); font-weight:700; padding:6px 4px; border-radius:8px;}
+.home-ver{display:flex; justify-content:center; align-items:center; gap:4px;}

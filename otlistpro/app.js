@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -517,10 +517,12 @@ function renderExport(){
   $("att-pdf").checked = settings.attachPdf==="1";
   const shX = canShareOne(new File([""],"x.xlsx",{type:XLSX_MIME})), shP = canShareOne(new File([""],"x.pdf",{type:"application/pdf"}));
   $("email-help").innerHTML = (shX && shP)
-    ? "Tap <b>Email the list</b>, then choose <b>Gmail</b> or <b>Outlook</b>. It opens with the ticked files attached and the subject and message filled in. Choose who it goes to, then tap Send."
+    ? "Tap <b>Share the list</b> and choose <b>Gmail</b>, <b>Outlook</b>, <b>WhatsApp</b>, <b>Drive</b> or another app. The ticked files go with it, and email apps get the subject and message filled in."
     : shP
-    ? "On this device the <b>PDF</b> is attached to the email automatically. The <b>Excel</b> file can't be, so if it's ticked the app will ask what you'd like to do. Nothing is downloaded unless you choose to save it."
-    : "This browser can't attach files to an email by itself. When you tap <b>Email the list</b>, the app offers to save the files to a folder you choose and then opens a new email, ready for you to attach them.";
+    ? "Tap <b>Share the list</b> and choose Gmail, Outlook, WhatsApp, Drive or another app. On this device the <b>PDF</b> can be shared but the <b>Excel</b> file can't, so if Excel is ticked the app asks what you'd like to do. Nothing is saved unless you choose to."
+    : (IS_ANDROID && !IS_ANDROID_CHROME)
+    ? `This app is running in <b>${browserName()}</b>, which can't open the share menu with files. Tap <b>Share the list</b> for the option to open it in <b>Chrome</b>, where sharing works.`
+    : "This browser can't open the share menu with files. Tap <b>Share the list</b> to save the files to a folder you choose and send them yourself.";
 }
 // shrink the full-width hospital list so the whole page is visible in the preview
 function fitPreview(){
@@ -839,35 +841,45 @@ async function shareFiles(files){
   catch(e){
     if(e.name==="AbortError") return true;   // closed the menu: nothing more to do
     // the menu may need a fresh tap (e.g. after a Save window); ask once more
-    const go = await choose("Open your email", "<p>Tap <b>Open email</b> and choose Gmail or Outlook.</p>",
-      [{label:"Open email", value:true, primary:true},{label:"Cancel", value:false, ghost:true}]);
+    const go = await choose("Open the share menu", "<p>Tap <b>Share</b>, then choose Gmail, Outlook, WhatsApp, Drive or another app.</p>",
+      [{label:"Share", value:true, primary:true},{label:"Cancel", value:false, ghost:true}]);
     if(!go) return true;
     try{ await navigator.share({files, title:emailSubject(), text:emailBody()}); }catch(_){}
     return true;
   }
 }
 const kindOf = f=> f.name.endsWith(".pdf") ? "PDF" : "Excel file";
+const UA = navigator.userAgent;
+const IS_ANDROID_CHROME = IS_ANDROID && /Chrome\//.test(UA) && !/SamsungBrowser|EdgA|OPR|Firefox|; wv\)/.test(UA);
+function browserName(){
+  return /SamsungBrowser/.test(UA) ? "Samsung Internet" : /EdgA?\//.test(UA) ? "Microsoft Edge" : /Firefox\//.test(UA) ? "Firefox"
+       : /OPR\//.test(UA) ? "Opera" : /; wv\)/.test(UA) ? "an in-app browser" : /Chrome\//.test(UA) ? "Chrome" : /Safari\//.test(UA) ? "Safari" : "this browser";
+}
+function openInChrome(){
+  const url = location.href.split("#")[0];
+  location.href = `intent://${location.host}${location.pathname}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+}
+
 $("emailbtn").addEventListener("click", async ()=>{
   const wantX = $("att-xlsx").checked, wantP = $("att-pdf").checked;
-  if(!wantX && !wantP){ toast("Tick Excel, PDF or both to attach."); return; }
+  if(!wantX && !wantP){ toast("Tick Excel, PDF or both to include."); return; }
   const files = [];
   if(wantX){ const blob = buildXlsx(); if(!blob) return; files.push(new File([blob], fileName("xlsx"), {type:XLSX_MIME})); }
   if(wantP){ const blob = buildPdf();  if(!blob) return; files.push(new File([blob], fileName("pdf"),  {type:"application/pdf"})); }
   const ok = files.filter(canShareOne), blocked = files.filter(f=>!canShareOne(f));
 
-  // 1. Everything can be attached: open the email menu straight away.
+  // 1. Everything can be shared: open the share menu straight away.
   if(!blocked.length){ await shareFiles(files); return; }
 
-  const mailto = ()=>{ location.href = `mailto:?subject=${encodeURIComponent(emailSubject())}&body=${encodeURIComponent(emailBody())}`; };
   const blockedNames = blocked.map(kindOf).join(" and ");
 
-  // 2. Some can be attached (usually the PDF) and some can't (usually Excel): ask.
+  // 2. Some files can be shared (usually the PDF) and some can't (usually Excel): ask.
   if(ok.length){
     const okNames = ok.map(kindOf).join(" and ");
-    const choice = await choose(`The ${blockedNames} can't be attached here`,
-      `<p>This device lets the app attach the <b>${okNames}</b> to an email, but not the <b>${blockedNames}</b>.</p><p>What would you like to do?</p>`,
-      [{label:`Email with the ${okNames} only`, value:"ok", primary:true},
-       {label:`Save the ${blockedNames} first, then email`, value:"save"},
+    const choice = await choose(`The ${blockedNames} can't be shared from here`,
+      `<p>This device lets the app share the <b>${okNames}</b>, but not the <b>${blockedNames}</b>.</p><p>What would you like to do?</p>`,
+      [{label:`Share the ${okNames} only`, value:"ok", primary:true},
+       {label:`Save the ${blockedNames}, then share`, value:"save"},
        {label:"Cancel", value:null, ghost:true}]);
     if(!choice) return;
     if(choice==="save"){
@@ -875,24 +887,58 @@ $("emailbtn").addEventListener("click", async ()=>{
       if(how==="cancelled") return;
       const go = await choose(`${blockedNames.charAt(0).toUpperCase()+blockedNames.slice(1)} saved`,
         `<p>${how==="downloaded" ? `It's in your <b>Downloads</b> folder.${IS_ANDROID ? " "+ANDROID_SAVE_TIP : ""}` : "It's in the folder you chose."}</p>`+
-        `<p>Next, your email opens with the <b>${okNames}</b> attached. Add the saved <b>${blockedNames}</b> to it as well, using the paper-clip button.</p>`,
-        [{label:"Open email", value:true, primary:true},{label:"Cancel", value:false, ghost:true}]);
+        `<p>Next, the share menu opens with the <b>${okNames}</b>. If you choose email, add the saved <b>${blockedNames}</b> with the paper-clip button.</p>`,
+        [{label:"Share", value:true, primary:true},{label:"Cancel", value:false, ghost:true}]);
       if(!go) return;
     }
     await shareFiles(ok);
     return;
   }
 
-  // 3. Nothing can be attached by this browser: offer to save, then open a blank email.
-  const choice = await choose("Attach the files yourself",
-    `<p>This browser can't attach files to an email by itself.</p><p>The app can save the <b>${blockedNames}</b> to a folder you choose, then open a new email with the subject and message filled in, ready for you to attach them.</p>`,
-    [{label:"Save files and open email", value:true, primary:true},{label:"Cancel", value:null, ghost:true}]);
+  // 3. This browser can't open the share menu with files at all.
+  if(IS_ANDROID && !IS_ANDROID_CHROME){
+    const choice = await choose("The share menu isn't available here",
+      `<p>OT List Pro is running in <b>${browserName()}</b>, which doesn't let apps share files.</p>`+
+      `<p>In <b>Chrome</b> it can share straight to Gmail, Outlook, WhatsApp, Drive and more. Tap <b>Open in Chrome</b>, then install the app from Chrome's ⋮ menu so it always opens there.</p>`,
+      [{label:"Open in Chrome", value:"chrome", primary:true},
+       {label:`Save the ${blockedNames} instead`, value:"save"},
+       {label:"Cancel", value:null, ghost:true}]);
+    if(choice==="chrome"){ openInChrome(); return; }
+    if(choice==="save") savedToast(blockedNames.charAt(0).toUpperCase()+blockedNames.slice(1), await saveFiles(files));
+    return;
+  }
+  const choice = await choose("The share menu isn't available here",
+    `<p>${browserName()==="this browser" ? "This browser" : browserName()} doesn't let apps share files.</p><p>You can save the <b>${blockedNames}</b> to a folder you choose and send ${files.length>1?"them":"it"} yourself.</p>`,
+    [{label:`Save the ${blockedNames}`, value:"save", primary:true},
+     {label:"Save and open a new email", value:"mail"},
+     {label:"Cancel", value:null, ghost:true}]);
   if(!choice) return;
   const how = await saveFiles(files);
   if(how==="cancelled") return;
-  mailto();
-  toast(`Saved. Attach the ${blockedNames} to the new email with the paper-clip button.`, null, null, 7000);
+  if(choice==="mail"){
+    location.href = `mailto:?subject=${encodeURIComponent(emailSubject())}&body=${encodeURIComponent(emailBody())}`;
+    toast(`Saved. Attach the ${blockedNames} to the new email with the paper-clip button.`, null, null, 7000);
+  } else savedToast(blockedNames.charAt(0).toUpperCase()+blockedNames.slice(1), how);
 });
+
+/* ============ check for updates ============ */
+let swReg = null, applyUpdate = null;
+async function checkForUpdates(){
+  if(!swReg){ toast("Updates can be checked once the app has been opened from its web link."); return; }
+  if(!navigator.onLine){ toast("You're offline. Connect to the internet, then check again."); return; }
+  const btn = $("updatebtn"); if(btn){ btn.disabled = true; btn.textContent = "Checking…"; }
+  try{
+    await swReg.update();
+    const w = swReg.waiting || swReg.installing;
+    if(w){
+      toast("A new version was found. Updating…", null, null, 6000);
+      if(w.state==="installed") applyUpdate(w, true);   // otherwise the update handler applies it when ready
+    } else toast(`You have the latest version (${APP_VERSION}).`);
+  }catch(e){ toast("Couldn't check for updates. Try again in a moment."); }
+  finally{ if(btn){ btn.disabled = false; btn.textContent = "Check for updates"; } }
+}
+document.addEventListener("click", e=>{ if(e.target.closest("[data-update]")) checkForUpdates(); });
+
 $("newlist").addEventListener("click", ()=>{
   cases = []; sourceText = ""; $("pastebox").value = ""; $("listdate").value = ""; $("session").value = settings.session;
   resetDrop();
@@ -948,7 +994,8 @@ window.addEventListener("appinstalled", ()=>{ $("installbtn").hidden = true; toa
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   navigator.serviceWorker.register("sw.js").then(reg=>{
     // New version found: switch to it straight away, unless a list is being worked on (then ask, so nothing is lost).
-    const offer = w => {
+    swReg = reg;
+    const offer = applyUpdate = (w, asked) => {
       if(!cases.length){ w.postMessage("skipWaiting"); return; }
       toast("A new version of OT List Pro is ready. Updating clears the list on screen.", "Update now", ()=>w.postMessage("skipWaiting"));
     };
