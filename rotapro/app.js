@@ -1,0 +1,1678 @@
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MON3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const DAYFULL=['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'];
+const CYCLE={A:[2],B:[0,2,4],C:[2,5,6]};
+const ORD=['A','B','C'];
+const ROLES=[
+  {key:'i1',label:'INTERN #1',grade:'INT'},
+  {key:'i2',label:'INTERN #2',grade:'INT'},
+  {key:'sho',label:'SHO',grade:'SHO'},
+  {key:'mo1a',label:'MO1',grade:'MO1'},
+  {key:'mo1b',label:'MO1',grade:'MO1'},
+  {key:'mo2',label:'MO2',grade:'MO2'},
+];
+const CONS=[
+  {key:'con1',label:'CON',grade:'CON'},
+  {key:'con2',label:'CON',grade:'CON'},
+];
+const ALL_EDIT=[...ROLES,...CONS];
+const SG_PAIRS=[['i1','i2'],['mo1a','mo1b']];
+const DEF={i1:'',i2:'',sho:'',mo1a:'',mo1b:'',mo2:'',con1:'',con2:''};
+// Rota Pro: the team is entered once in Team & settings and kept on this device.
+function teamDefaults(){try{return Object.assign({},DEF,JSON.parse(localStorage.getItem('rotapro.team')||'{}'));}catch(e){return {...DEF};}}
+function proSetting(k,d){try{const v=JSON.parse(localStorage.getItem('rotapro.settings')||'{}')[k];return (v===undefined||v==='')?d:v;}catch(e){return d;}}
+function escHtml(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function rotaTitle(){return proSetting('title','GENERAL SURGERY FIRM C ROTA');}
+function hospitalName(){return proSetting('hospital','Cornwall Regional Hospital');}
+function filePrefix(){return String(proSetting('prefix','GenSx_C')).replace(/[\\/:*?"<>|]+/g,'_');}
+const STATUS_OPTS=[
+  {v:'',label:'Working'},{v:'*',label:'Day Off 1 (*)'},{v:'**',label:'Day Off 2 (**)'},
+  {v:'DOH',label:'DOH'},{v:'DL',label:'DL'},{v:'VL',label:'VL'},{v:'SL',label:'SL'},
+  {v:'EDL',label:'EDL'},
+];
+// Consultants: leave only — no day-off (*/**) or DOH
+const CON_STATUS_OPTS=[
+  {v:'',label:'Working'},{v:'DL',label:'DL'},{v:'VL',label:'VL'},{v:'SL',label:'SL'},{v:'EDL',label:'EDL'},
+];
+// Rotation-transition markers live in their own field (S.over[..].mark) so they can
+// COEXIST with a leave/day-off symbol — e.g. an intern on VL through her End of Rotation
+// reads "A. BROWN VL (EOR)". Set via Staff Change; clearable in the day modal.
+const MARK_OPTS=[
+  {v:'',label:'None'},{v:'(EOR)',label:'(EOR) End of Rotation'},
+  {v:'(SF)',label:'(SF) Switched Firms'},{v:'(AD)',label:'(AD) Assumed Duties'},
+  {v:'(ROD)',label:'(ROD) Resumption of Duties'},
+];
+// Consultants don't rotate — they only ever resume from leave, so just None / (ROD).
+const CON_MARK_OPTS=[{v:'',label:'None'},{v:'(ROD)',label:'(ROD) Resumption of Duties'}];
+const OVT_OPTS=[{v:'',label:'No OvT'},{v:'+',label:'+'},{v:'*+',label:'*+'},{v:'**+',label:'**+'}];
+// Statuses that can be stretched across a date range from the open day forward.
+// DOH is excluded on purpose — a day off is honoured one day at a time.
+const LEAVE_RANGEABLE=['DL','VL','SL','EDL'];
+
+const S={year:2026,month:6,cycle:'A',names:teamDefaults(),changes:{},
+  days:[],           // array of {date:Date, inMonth:bool, duty:bool}
+  offs:{},           // {isoDate:{key:'*'|'**'}}
+  over:{},           // {isoDate:{key:{sym,ovt}}}
+  holidays:{},       // {isoDate:true} — Public Holiday, day-level flag (applies to whoever works that day)
+  _prevMerge:null,   // {data,source,fileName} — staged previous month's rota for boundary-day continuity
+  _cycleAuto:null,   // 'A'|'B'|'C'|null — cycle letter auto-continued from _prevMerge's actual pattern
+  built:false,openDay:null};
+function isHoliday(isoDate){return !!S.holidays[isoDate];}
+
+function dim(y,m){return new Date(y,m+1,0).getDate();}
+function wd(dt){return(dt.getDay()+6)%7;}
+function iso(dt){return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}
+function addDays(dt,n){const d=new Date(dt);d.setDate(d.getDate()+n);return d;}
+
+// Build the full day list: last week prev month → month → first week next month
+function buildDayList(y,m){
+  // Start = Monday of the week containing the last day of prev month;
+  // if that week shows fewer than 5 days of the prev month, go one week earlier
+  const prevLast=new Date(y,m,0); // last day of prev month
+  let startMon=addDays(prevLast,-wd(prevLast));
+  const prevDays=Math.round((prevLast-startMon)/86400000)+1;
+  if(prevDays<5)startMon=addDays(startMon,-7);
+  // End = Sunday of the week containing the first day of next month;
+  // if that week shows fewer than 5 days of the next month, extend one week later
+  const nextFirst=new Date(y,m+1,1);
+  let endSun=addDays(nextFirst,6-wd(nextFirst));
+  const nextDays=Math.round((endSun-nextFirst)/86400000)+1;
+  if(nextDays<5)endSun=addDays(endSun,7);
+  const list=[];
+  let cur=new Date(startMon);
+  while(cur<=endSun){
+    list.push({date:new Date(cur),inMonth:cur.getMonth()===m});
+    cur=addDays(cur,1);
+  }
+  return list;
+}
+
+// Assign duty based on cycle, anchored to first FULL week of the month
+function assignDuty(days,y,m,startCycle){
+  // Find the Monday of the first week that starts within or at the month
+  // We anchor startCycle to the week containing the 1st of the month
+  const first=new Date(y,m,1);
+  const firstWeekMon=addDays(first,-wd(first));
+  // Walk weeks; assign cycle letters forward from startCycle at firstWeekMon
+  // Determine cycle index for each week relative to firstWeekMon
+  const msWeek=7*86400000;
+  days.forEach(d=>{
+    const dMon=addDays(d.date,-wd(d.date));
+    const weekDiff=Math.round((dMon-firstWeekMon)/msWeek);
+    const ci=((ORD.indexOf(startCycle)+weekDiff)%3+3)%3;
+    const pat=CYCLE[ORD[ci]];
+    d.duty=pat.includes(wd(d.date));
+  });
+}
+
+// Auto day-off allocation across all weeks in the list
+function autoOffs(days){
+  const staff=ROLES.map(r=>r.key);
+  const res={};
+  const ss={};staff.forEach(k=>ss[k]=false);
+  // Group into weeks (Mon-Sun)
+  const weeks=[];
+  for(let i=0;i<days.length;i+=7)weeks.push(days.slice(i,i+7));
+  // Track last weekend-off week index per staff (for back-to-back prevention)
+  const lastWkndWeek={};staff.forEach(k=>lastWkndWeek[k]=-99);
+
+  weeks.forEach((week,wIdx)=>{
+    const avail=week.filter(d=>!d.duty).map(d=>({iso:iso(d.date),w:wd(d.date)}));
+    if(avail.length<2)return;
+    const pairs=[];
+    for(let i=0;i<avail.length;i++)
+      for(let j=i+1;j<avail.length;j++)
+        pairs.push([avail[i],avail[j]]);
+    const isSS=p=>{const w=p.map(x=>x.w).sort((a,b)=>a-b);return w[0]===5&&w[1]===6;};
+    let best=null;const dc={};
+    const rec=(si,asgn)=>{
+      if(best)return;
+      if(si===staff.length){
+        for(const[p1,p2]of SG_PAIRS){
+          const d1=new Set((asgn[p1]||[]).map(x=>x.iso));
+          const d2=new Set((asgn[p2]||[]).map(x=>x.iso));
+          for(const d of d1)if(d2.has(d))return;
+        }
+        if(Object.values(dc).some(v=>v>3))return;
+        best={};staff.forEach(k=>best[k]=asgn[k]);return;
+      }
+      const k=staff[si];
+      const sorted=[...pairs].sort((a,b)=>{
+        // Prefer SS if not yet got and not back-to-back
+        const canSSa=isSS(a)&&!ss[k]&&(wIdx-lastWkndWeek[k]>1);
+        const canSSb=isSS(b)&&!ss[k]&&(wIdx-lastWkndWeek[k]>1);
+        const sa=canSSa?0:1,sb=canSSb?0:1;
+        const spa=Math.max(...a.map(x=>dc[x.iso]||0));
+        const spb=Math.max(...b.map(x=>dc[x.iso]||0));
+        return(sa-sb)||(spa-spb);
+      });
+      for(const pr of sorted){
+        if(best)return;
+        // back-to-back weekend guard
+        if(isSS(pr)&&(wIdx-lastWkndWeek[k]===1))continue;
+        let ov=false;
+        for(const x of pr){dc[x.iso]=(dc[x.iso]||0)+1;if(dc[x.iso]>3)ov=true;}
+        if(!ov){asgn[k]=pr;rec(si+1,asgn);}
+        for(const x of pr)dc[x.iso]--;
+        if(!best)delete asgn[k];
+      }
+    };
+    rec(0,{});
+    // Fallback: if no solution with weekend guard, relax it
+    if(!best){
+      const rec2=(si,asgn)=>{
+        if(best)return;
+        if(si===staff.length){
+          for(const[p1,p2]of SG_PAIRS){
+            const d1=new Set((asgn[p1]||[]).map(x=>x.iso));
+            const d2=new Set((asgn[p2]||[]).map(x=>x.iso));
+            for(const d of d1)if(d2.has(d))return;
+          }
+          if(Object.values(dc).some(v=>v>3))return;
+          best={};staff.forEach(k=>best[k]=asgn[k]);return;
+        }
+        const k=staff[si];
+        for(const pr of pairs){
+          if(best)return;
+          let ov=false;
+          for(const x of pr){dc[x.iso]=(dc[x.iso]||0)+1;if(dc[x.iso]>3)ov=true;}
+          if(!ov){asgn[k]=pr;rec2(si+1,asgn);}
+          for(const x of pr)dc[x.iso]--;
+          if(!best)delete asgn[k];
+        }
+      };
+      rec2(0,{});
+    }
+    if(best){
+      for(const k of staff){
+        if(!best[k])continue;
+        const[d1,d2]=best[k].sort((a,b)=>a.w-b.w);
+        if(!res[d1.iso])res[d1.iso]={};
+        if(!res[d2.iso])res[d2.iso]={};
+        res[d1.iso][k]='*';res[d2.iso][k]='**';
+        if(isSS(best[k])){ss[k]=true;lastWkndWeek[k]=wIdx;}
+      }
+    }
+  });
+  return res;
+}
+
+function getE(isoDate,key){
+  const ov=S.over[isoDate]?.[key];
+  if(ov)return{sym:ov.sym,ovt:ov.ovt,cover:ov.cover||'',ext:ov.ext||'',mark:ov.mark||''};
+  return{sym:S.offs[isoDate]?.[key]||'',ovt:'',cover:'',ext:'',mark:''};
+}
+// The trailing designation shown after a name: leave/day-off code plus any rotation
+// marker. Overtime replaces the day-off code (it already encodes it, e.g. *+).
+function trailStr(sym,ovt,mark){
+  const status=ovt||sym||'';
+  return [status,mark].filter(Boolean).join(' ');
+}
+// The full text shown in a person's cell (no bold markup — callers handle bold).
+// Absence codes (DOH/DL/VL/SL/EDL) show the SYMBOL ONLY — the column already tells you
+// whose it is, so the name is dropped to save print space. Everyone else shows their
+// name plus any trailing code. Rotation markers and duty covers append in both cases.
+// holiday: Public Holiday flag for the day — appends Ⓗ to whoever is actually WORKING
+// (not to someone on leave/DOH, unless a covering doctor is doing the duty for them).
+function cellText(nm,sym,ovt,cover,mark,duty,holiday){
+  const isLv=['DOH','DL','VL','SL','EDL'].includes(sym);
+  const trail=trailStr(sym,ovt,mark);
+  if(isLv){
+    const coveringWorks=duty&&cover; // only the covering doctor is actually working
+    const hMark=holiday&&coveringWorks?' Ⓗ':'';
+    const coverStr=cover?` (${cover}${duty?' $':''}${hMark})`:'';
+    return `${trail}${coverStr}`;
+  }
+  const hMark=holiday?' Ⓗ':'';
+  return trail?`${nm} ${trail}${hMark}`:`${nm}${hMark}`;
+}
+
+// Resolve the occupant of a position on a given date (handles mid-month changeovers)
+function nameOn(isoDate,key){
+  const chs=S.changes[key];
+  if(!chs||!chs.length)return S.names[key];
+  let nm=S.names[key];
+  chs.forEach(ch=>{if(ch.from<=isoDate)nm=ch.name;});
+  return nm;
+}
+
+// Day-off entitlement: rostered 7 days, 2 allocated off → hold 7 days = 2 off, 6 days = 1 off, ≤5 days = 0 off
+function allowedOffs(daysHeld){return Math.min(2,Math.max(0,daysHeld-5));}
+// Split a Mon–Sun week into occupant segments for a slot (handles changeovers and vacancy)
+function slotSegments(weekDays,key){
+  const segs=[];
+  weekDays.forEach(d=>{
+    const isoD=iso(d.date);
+    const nm=nameOn(isoD,key);
+    if(!nm)return;
+    const last=segs[segs.length-1];
+    if(last&&last.name===nm)last.days.push(d);
+    else segs.push({name:nm,days:[d]});
+  });
+  return segs;
+}
+
+// Reconcile a person's week: only DOH cancels an allocated day-off (one-for-one).
+// Leave (DL/VL/SL/EDL) means the person is away from work — it does NOT consume a day-off slot.
+function reconcileWeek(key,anchorDate){
+  // Find the Mon-Sun week containing anchorDate within S.days
+  const anchor=new Date(anchorDate+'T00:00:00');
+  const weekMon=addDays(anchor,-wd(anchor));
+  const weekDays=S.days.filter(d=>{
+    const dm=addDays(d.date,-wd(d.date));
+    return iso(dm)===iso(weekMon);
+  });
+  // Occupant on the anchor date; entitlement from days THEY hold this week
+  const occupant=nameOn(anchorDate,key);
+  if(!occupant)return; // vacant — nothing to reconcile
+  const theirDays=weekDays.filter(d=>nameOn(iso(d.date),key)===occupant);
+  const allowance=allowedOffs(theirDays.length);
+  // DOH cancels day-offs one-for-one within the entitlement
+  let dohCount=0;
+  theirDays.forEach(d=>{
+    const ov=S.over[iso(d.date)]?.[key];
+    if(ov&&ov.sym==='DOH')dohCount++;
+  });
+  let allowedAuto=Math.max(0,allowance-dohCount);
+  theirDays.forEach(d=>{
+    const isoD=iso(d.date);
+    const autoSym=S.offs[isoD]?.[key];
+    if(autoSym==='*'||autoSym==='**'){
+      const ov=S.over[isoD]?.[key];
+      if(!ov||ov.sym===autoSym){
+        if(allowedAuto>0){
+          allowedAuto--;
+        }else{
+          if(!S.over[isoD])S.over[isoD]={};
+          const prev=S.over[isoD][key]||{};
+          S.over[isoD][key]={sym:'',ovt:prev.ovt||'',cover:prev.cover||'',ext:prev.ext||'',mark:prev.mark||''};
+        }
+      }
+    }
+  });
+}
+
+function setE(isoDate,key,sym,ovt){
+  if(!S.over[isoDate])S.over[isoDate]={};
+  const prev=S.over[isoDate][key]||{};
+  // A covering doctor is only valid against a recorded absence; if the holder is now
+  // working or on DOH, drop any cover so the position isn't shown worked by two people.
+  const keepCover=['DL','VL','SL','EDL'].includes(sym)?(prev.cover||''):'';
+  S.over[isoDate][key]={sym,ovt,cover:keepCover,ext:prev.ext||'',mark:prev.mark||''};
+  reconcileWeek(key,isoDate);
+  renderRota();renderAudit();autoSave();
+  openDayIso(isoDate);
+}
+
+function buildNamesForm(){
+  let h='';
+  ALL_EDIT.forEach(r=>{
+    const suffix=r.key==='mo1a'?' (a)':r.key==='mo1b'?' (b)':r.key==='con1'?' 1':r.key==='con2'?' 2':'';
+    h+=`<div class="field"><label class="lbl">${r.label}${suffix}</label>
+      <input type="text" id="n-${r.key}" value="${S.names[r.key]}" placeholder="(leave blank = vacant)" oninput="S.names['${r.key}']=this.value"></div>`;
+  });
+  document.getElementById('namesForm').innerHTML=h;
+}
+function pickCycle(c,manual){
+  S.cycle=c;
+  ['A','B','C'].forEach(x=>document.getElementById('cyc-'+x).classList.toggle('on',x===c));
+  if(manual)S._cycleAuto=null; // user overrode it — stop treating it as auto-continued
+  renderCycleAutoNote();
+}
+function renderCycleAutoNote(){
+  const el=document.getElementById('cycleAutoNote');
+  if(!el)return;
+  if(S._cycleAuto){
+    el.style.display='block';
+    el.textContent=`✅ Auto-continued as ${S._cycleAuto} from last month's actual pattern. Tap a different letter above if the cycle was disrupted.`;
+  }else{
+    el.style.display='none';
+  }
+}
+function stateChange(){S.month=+document.getElementById('selM').value;S.year=+document.getElementById('selY').value;S.built=false;tryLoad();checkContinuity();renderRota();renderAudit();}
+
+// ── CONTINUITY: carry boundary-day edits (leave/markers/$ sessions/Ⓗ) from last month's rota ──
+function monthLabel(y,m){return `${MONTHS[m]} ${y}`;}
+// Reads the ACTUAL duty pattern last month's rota already assigned to the week this
+// month shares with it (its "first week of next month" = our "first full week"), and
+// returns the matching cycle letter — so the new month continues the real 3-week
+// rotation instead of restarting it. Returns null if that week isn't in the data,
+// or its pattern doesn't cleanly match any cycle (e.g. it was manually disrupted).
+function detectContinuedCycle(prevData){
+  if(!prevData||!prevData.days)return null;
+  const dutyByIso={};
+  prevData.days.forEach(x=>{dutyByIso[x.d]=x.dt;});
+  const first=new Date(S.year,S.month,1);
+  const firstWeekMon=addDays(first,-wd(first));
+  const wds=new Set();
+  for(let i=0;i<7;i++){
+    const d=addDays(firstWeekMon,i);
+    const isoD=iso(d);
+    if(!(isoD in dutyByIso))return null; // that week isn't covered by last month's data
+    if(dutyByIso[isoD])wds.add(wd(d));
+  }
+  return classifyCycleWeek(wds);
+}
+// Auto-detect last month's rota saved on THIS device/browser. If found, stage it for
+// merging on Generate, and auto-continue the duty cycle from its actual pattern.
+// If not found (e.g. switched devices), prompt for a manual file upload.
+function checkContinuity(){
+  S._prevMerge=null;
+  S._cycleAuto=null;
+  try{
+    const raw=localStorage.getItem(prevMonthKey());
+    if(raw){
+      const data=JSON.parse(raw);
+      S._prevMerge={data,source:'device'};
+      // Only auto-pick the cycle for a rota we haven't built yet — if one's already
+      // built/loaded for this month, its cycle is a fact, not a suggestion to override.
+      if(!S.built)applyDetectedCycle(data);
+    }
+  }catch(e){}
+  renderCycleAutoNote();
+  renderContinuityStatus();
+}
+// Set the cycle picker from last month's data, but only ever as a starting suggestion —
+// the buttons stay fully clickable so it can be corrected if the cycle was disrupted.
+function applyDetectedCycle(data){
+  const letter=detectContinuedCycle(data);
+  if(letter){S._cycleAuto=letter;pickCycle(letter);}
+  else{S._cycleAuto=null;}
+}
+function renderContinuityStatus(){
+  const el=document.getElementById('continuityStatus');
+  if(!el)return;
+  let py=S.year,pm=S.month-1;if(pm<0){pm=11;py--;}
+  const label=monthLabel(py,pm);
+  if(S._prevMerge){
+    const src=S._prevMerge.source==='file'?`uploaded file (${S._prevMerge.fileName||'—'})`:'this device';
+    const cycleLine=S._cycleAuto
+      ? `Duty cycle auto-continued as <b>${S._cycleAuto}</b> from its actual pattern — change it below if the cycle was disrupted.`
+      : `Couldn't auto-detect the duty cycle from it (the shared week wasn't a clean match) — please check/set it below.`;
+    el.innerHTML=`✅ Found <b>${label}</b>'s rota (${src}) — its shared boundary days will merge in automatically when you tap Generate. ${cycleLine}`;
+    el.style.background='var(--passBg)';
+  }else{
+    el.innerHTML=`⚠ No saved <b>${label}</b> rota found on this device. If you edited it on another device (tablet/desktop), upload that saved rota file below so its boundary-day edits (leave, markers, $ sessions, Ⓗ) — and its duty cycle — carry into this month. Otherwise you'll need to set the cycle and re-enter edits here manually.`;
+    el.style.background='var(--warnBg)';
+  }
+}
+// Manual upload — for when last month's rota was saved/edited on a different device
+function loadPrevRotaForMerge(input){
+  const file=input.files&&input.files[0];
+  input.value='';
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data.days||!data.names){toast('Not a valid rota file');return;}
+      S._prevMerge={data,source:'file',fileName:file.name};
+      if(!S.built)applyDetectedCycle(data);
+      renderCycleAutoNote();
+      renderContinuityStatus();
+      toast(`${monthLabel(data.year,data.month)} rota loaded for boundary merge${S._cycleAuto?` — cycle continued as ${S._cycleAuto}`:''} ✓`);
+    }catch(err){toast('Could not read rota file');}
+  };
+  reader.readAsText(file);
+}
+
+function generate(){
+  ALL_EDIT.forEach(r=>{const el=document.getElementById('n-'+r.key);if(el)S.names[r.key]=el.value.trim();});
+  S.days=buildDayList(S.year,S.month);
+  assignDuty(S.days,S.year,S.month,S.cycle);
+  S.offs=autoOffs(S.days);
+  S.over={};
+  S.holidays={};
+  S.built=true;
+  const merged=mergeBoundaryEdits();
+  renderRota();renderAudit();autoSave();
+  goTab('rota');
+  toast(merged?`Rota generated ✓ — ${merged} boundary-day edit(s) carried over from last month`:'Rota generated ✓');
+}
+// Pull leave/markers/$-sessions/Public-Holiday from the staged previous month's rota
+// onto whichever dates this month's rota shares with it (the boundary week on each end).
+// Returns the count of dates merged, or 0 if nothing was staged / nothing overlapped.
+function mergeBoundaryEdits(){
+  if(!S._prevMerge||!S._prevMerge.data)return 0;
+  const prev=S._prevMerge.data;
+  const prevOver=prev.over||{};
+  const prevHolidays=prev.holidays||{};
+  const validIso=new Set(S.days.map(d=>iso(d.date)));
+  const touched=new Set();
+  Object.keys(prevOver).forEach(isoD=>{
+    if(!validIso.has(isoD))return;
+    S.over[isoD]=JSON.parse(JSON.stringify(prevOver[isoD]));
+    touched.add(isoD);
+  });
+  Object.keys(prevHolidays).forEach(isoD=>{
+    if(!validIso.has(isoD))return;
+    S.holidays[isoD]=true;
+    touched.add(isoD);
+  });
+  return touched.size;
+}
+
+function renderRota(){
+  if(!S.built){document.getElementById('rotaList').innerHTML='<div class="empty"><p>Set up and tap Generate.</p></div>';return;}
+  let h=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+    <label for="ovtFile" class="btn btn-out" style="flex:1;font-size:13px;min-width:180px;text-align:center;display:inline-block;">⬆ Upload Overtime Spreadsheet</label>
+  </div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">Tap any day to set leave (single day or across a date range), DOH, overtime, day-off status, or a staff change.</p>`;
+  let lastMonth=-1;
+  S.days.forEach((d,i)=>{
+    const w=wd(d.date);
+    if(w===0){
+      const wkNum=Math.floor(i/7)+1;
+      const wkEnd=addDays(d.date,6);
+      h+=`<div class="week-sep"><span>Week ${wkNum}</span><span class="ws-range">${DAYS[0]} ${d.date.getDate()} ${MON3[d.date.getMonth()]} – ${DAYS[6]} ${wkEnd.getDate()} ${MON3[wkEnd.getMonth()]}</span></div>`;
+    }
+    if(d.date.getMonth()!==lastMonth){
+      lastMonth=d.date.getMonth();
+      h+=`<div class="month-tag">${MONTHS[lastMonth]} ${d.date.getFullYear()}</div>`;
+    }
+    const isoD=iso(d.date);
+    let cells='';
+    ROLES.forEach(r=>{
+      const nm=nameOn(isoD,r.key);
+      if(!nm){
+        const{ext,sym}=getE(isoD,r.key);
+        if(sym==='$'&&ext){
+          const hMark=isHoliday(isoD)?' <b class="ph-mark">Ⓗ</b>':'';
+          cells+=`<div class="sc dty"><span class="sc-role">${r.label}:</span>${ext} <b>$</b>${hMark}</div>`;
+        }else{
+          cells+=`<div class="sc"><span class="sc-role">${r.label}:</span></div>`;
+        }
+        return;
+      }
+      const{sym,ovt,cover,mark}=getE(isoD,r.key);
+      const isLv=['DOH','DL','VL','SL','EDL'].includes(sym);
+      const isO1=sym==='*',isO2=sym==='**';
+      const isDty=d.duty&&(!isLv||!!cover);
+      let cls='sc'+(isLv?' lv':isO1?' off1':isO2?' off2':'')+(isDty?' dty':'');
+      let shown;
+      if(isLv){
+        // absence → symbol only (with any marker/cover), bolded
+        shown=`<b>${cellText(nm,sym,ovt,cover,mark,d.duty,isHoliday(isoD))}</b>`;
+      }else{
+        const trail=trailStr(sym,ovt,mark);
+        const hMark=isHoliday(isoD)?' <b class="ph-mark">Ⓗ</b>':'';
+        shown=trail?`${nm} <b>${trail}</b>${hMark}`:`${nm}${hMark}`;
+      }
+      cells+=`<div class="${cls}"><span class="sc-role">${r.label}:</span>${shown}</div>`;
+    });
+    CONS.forEach(r=>{
+      const{sym,mark}=getE(isoD,r.key);
+      const isLv=['DL','VL','SL','EDL'].includes(sym);
+      const cls='sc dty'+(isLv?' lv':'');
+      const shown=isLv?`<b>${cellText(S.names[r.key],sym,'','',mark,false,isHoliday(isoD))}</b>`
+                      :(mark?`${S.names[r.key]} <b>${mark}</b>${isHoliday(isoD)?' <b class="ph-mark">Ⓗ</b>':''}`:`${S.names[r.key]}${isHoliday(isoD)?' <b class="ph-mark">Ⓗ</b>':''}`);
+      cells+=`<div class="${cls}"><span class="sc-role">CON:</span>${shown}</div>`;
+    });
+    h+=`<div class="day-card${d.duty?' duty':''}${d.inMonth?'':' adjacent'}" onclick="openDayIso('${isoD}')">
+      <div class="day-top"><span class="day-date">${DAYS[w]} ${d.date.getDate()} ${MON3[d.date.getMonth()]}${isHoliday(isoD)?' <span class="ph-tag">Ⓗ HOLIDAY</span>':''}</span>
+      ${d.duty?'<span class="duty-tag">DUTY</span>':'<span style="color:var(--muted);font-size:18px;">›</span>'}</div>
+      <div class="day-body">${cells}</div></div>`;
+  });
+  document.getElementById('rotaList').innerHTML=h;
+  const sb=document.getElementById('rotaSaveBar');
+  if(sb)sb.style.display='block';
+}
+
+function openDayIso(isoD){
+  S.openDay=isoD;
+  const dObj=S.days.find(d=>iso(d.date)===isoD);
+  if(!dObj)return;
+  const w=wd(dObj.date);
+  document.getElementById('mTitle').textContent=`${DAYS[w]} ${dObj.date.getDate()} ${MONTHS[dObj.date.getMonth()]} ${dObj.date.getFullYear()}`;
+  document.getElementById('mSub').textContent=dObj.duty?'⚡ DUTY DAY — absences must use DL/VL/SL/EDL (not DOH)':'Regular working day';
+  const hol=isHoliday(isoD);
+  let h=`<div class="range-box" style="background:${hol?'var(--passBg)':'#fff'};border-color:${hol?'var(--pass)':'var(--line)'};margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+    <div style="font-size:13px;"><b style="font-size:16px;">Ⓗ</b> <b>Public Holiday</b>${hol?' — marked for this date ✓':''}
+      <p style="font-size:11px;color:var(--muted);margin:2px 0 0;">Marks the WHOLE day. Anyone actually working (regular 8–4, on duty, or a $ session) gets Ⓗ next to their name automatically.</p>
+    </div>
+    <button class="btn ${hol?'btn-pass':'btn-out'}" style="padding:9px 14px;font-size:12px;white-space:nowrap;" onclick="toggleHoliday('${isoD}')">${hol?'Clear':'Mark Ⓗ'}</button>
+  </div>`;
+  ROLES.forEach(r=>{
+    const{sym,ovt}=getE(isoD,r.key);
+    let pills='';
+    STATUS_OPTS.forEach(o=>{pills+=`<span class="pill${o.v===sym?' on':''}" onclick="setE('${isoD}','${r.key}','${o.v}','${ovt}')">${o.label}</span>`;});
+    let ovtPills='';
+    OVT_OPTS.forEach(o=>{ovtPills+=`<span class="pill${o.v===ovt?' on':''}" onclick="setE('${isoD}','${r.key}','${sym}','${o.v}')">${o.label}</span>`;});
+    const nmDay=nameOn(isoD,r.key);
+    if(!nmDay){
+      const{ext,sym}=getE(isoD,r.key);
+      const active=sym==='$'&&ext;
+      h+=`<div class="srow"><div class="srow-name">${r.label} — <span style="color:var(--muted);font-style:italic;">vacant</span></div>
+        <div class="range-box" style="background:var(--ice);border-color:var(--sky);">
+          <div class="lbl" style="margin-bottom:6px;">🆕 New team member assumes this position (AD) — from this day onward</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="ad-${r.key}" placeholder="e.g. J. SMITH" style="flex:1;margin-bottom:0;">
+            <button class="btn btn-sky" style="padding:10px 16px;font-size:13px;white-space:nowrap;" onclick="assumeDuties('${isoD}','${r.key}')">Assume duties →</button>
+          </div>
+          <p style="font-size:11px;color:var(--muted);margin-top:6px;">Permanent — the new doctor gets (AD) today and holds the column onward, until their own EOR. Their beginning of rotation.</p>
+        </div>
+        <div class="range-box" style="background:var(--warnBg);border-color:var(--warn);margin-top:8px;">
+          <div class="lbl" style="margin-bottom:6px;">⚡ Emergency Duty Session ($) — this day only</div>
+          <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Someone covers this vacant slot for a single duty session/call. If their own grade differs from this column, add it in brackets after the name (e.g. "GRANT (SHO)") so it prints correctly.</p>
+          <select id="ext-pick-${r.key}" onchange="if(this.value){document.getElementById('ext-${r.key}').value=this.value;}" style="margin-bottom:6px;">
+            <option value="">— or pick from your own team (optional) —</option>
+            ${ALL_EDIT.map(m=>`<option value="${S.names[m.key]}">${m.label}${m.key==='mo1a'?' (a)':m.key==='mo1b'?' (b)':''} — ${nameOn(isoD,m.key)||S.names[m.key]}</option>`).join('')}
+          </select>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="ext-${r.key}" value="${ext||''}" placeholder="e.g. R. CLARKE, or GRANT (SHO)" style="flex:1;margin-bottom:0;">
+            <button class="btn btn-navy" style="padding:10px 16px;font-size:13px;white-space:nowrap;" onclick="applyDutySession('${isoD}','${r.key}')">Apply $</button>
+          </div>
+          ${active?`<button class="btn btn-out" style="margin-top:8px;padding:8px;font-size:12px;width:100%;" onclick="clearDutySession('${isoD}','${r.key}')">Clear duty session</button>`:''}
+          <p style="font-size:11px;color:var(--muted);margin-top:6px;">Covers this one day only — doesn't touch their own position or day-off entitlement for their regular column.</p>
+        </div></div>`;
+      return;
+    }
+    const warn=(sym==='DOH'&&dObj.duty)?'<div class="warn-box">⚠ DOH is not valid on a duty day — use DL, VL, SL, or EDL instead.</div>':'';
+    const{cover,mark}=getE(isoD,r.key);
+    // A covering doctor may only be placed when the holder has a recorded absence
+    // (VL/DL/SL/EDL). Regular work, worked day-offs, and DOH all refuse a substitute —
+    // the position is theirs and cannot be worked by two people.
+    const ABSENT=['DL','VL','SL','EDL'];
+    let coverBox;
+    if(ABSENT.includes(sym)){
+      const dutyCover=dObj.duty;
+      const lbl=dutyCover
+        ? '⚡ Emergency Duty Session ($) — outside doctor doing this duty'
+        : 'Covering doctor (other firm) working this position — optional';
+      coverBox=`<div class="lbl" style="margin-top:10px;margin-bottom:6px;">${lbl}</div>
+       <input type="text" value="${cover||''}" placeholder="e.g. CLARKE" onchange="setCover('${isoD}','${r.key}',this.value)" style="margin-bottom:0;">
+       ${dutyCover?`<p style="font-size:11px;color:var(--muted);margin-top:6px;">${nameOn(isoD,r.key)} isn't doing the assigned emergency duty — the doctor entered here does it as a paid $ session.</p>`:''}`;
+    }else if(sym==='DOH'){
+      coverBox=`<p style="font-size:11px;color:var(--muted);margin-top:10px;">Day off honoured — no substitute is placed on a day off.</p>`;
+    }else{
+      // working (regular, or worked day-off *, **) — position is filled
+      coverBox=`<p style="font-size:11px;color:var(--muted);margin-top:10px;">${nameOn(isoD,r.key)} is working this position. To place a covering doctor, first record an absence (VL, DL, SL, or EDL).</p>`;
+    }
+    // Rotation marker (EOR / SF / AD) — direct quick-set pills, so End of Rotation and
+    // Switched Firms can be applied on a person's last day without opening Staff Change.
+    let markPills='';
+    MARK_OPTS.forEach(o=>{markPills+=`<span class="pill${o.v===mark?' on':''}" onclick="setMark('${isoD}','${r.key}','${o.v}')">${o.label}</span>`;});
+    const markBox=`<div class="lbl" style="margin-top:10px;margin-bottom:6px;">Rotation marker</div><div class="pill-row">${markPills}</div>`;
+    // Leave types can be stretched across a date range from this day forward.
+    // DOH is deliberately excluded — it is a single-day honour, never a block.
+    const rangeBox=LEAVE_RANGEABLE.includes(sym)?
+      `<div class="range-box">
+         <div class="lbl" style="margin-bottom:6px;">Run this ${sym} through to…</div>
+         <div style="display:flex;gap:8px;align-items:center;">
+           <select id="rgsel-${r.key}" style="flex:1;">${forwardDateOpts(isoD)}</select>
+           <button class="btn btn-sky" style="padding:10px 14px;font-size:13px;white-space:nowrap;" onclick="applyLeaveRange('${isoD}','${r.key}','${sym}')">Apply ${sym}</button>
+         </div>
+         <p style="font-size:11px;color:var(--muted);margin-top:6px;">Leave blank-ended? Just pick the same date to keep it a single day.</p>
+       </div>`:
+      (sym==='DOH'?`<p style="font-size:11px;color:var(--muted);margin-top:8px;">DOH applies to this day only — honour each day off individually.</p>`:'');
+    h+=`<div class="srow"><div class="srow-name">${r.label} — ${nameOn(isoD,r.key)}</div>
+      <div class="lbl" style="margin-bottom:6px;">Status</div><div class="pill-row">${pills}</div>${warn}
+      ${rangeBox}${markBox}
+      <div class="lbl" style="margin-top:10px;margin-bottom:6px;">Overtime</div><div class="pill-row">${ovtPills}</div>
+      ${coverBox}
+      <button class="btn btn-sky" style="margin-top:10px;width:100%;padding:9px;" onclick="closeModal()">Done</button></div>`;
+  });
+  // Consultants — leave options only (no day-off, no DOH, no OvT)
+  CONS.forEach(r=>{
+    const{sym,mark}=getE(isoD,r.key);
+    let pills='';
+    CON_STATUS_OPTS.forEach(o=>{pills+=`<span class="pill${o.v===sym?' on':''}" onclick="setE('${isoD}','${r.key}','${o.v}','')">${o.label}</span>`;});
+    const rangeBox=LEAVE_RANGEABLE.includes(sym)?
+      `<div class="range-box">
+         <div class="lbl" style="margin-bottom:6px;">Run this ${sym} through to…</div>
+         <div style="display:flex;gap:8px;align-items:center;">
+           <select id="rgsel-${r.key}" style="flex:1;">${forwardDateOpts(isoD)}</select>
+           <button class="btn btn-sky" style="padding:10px 14px;font-size:13px;white-space:nowrap;" onclick="applyLeaveRange('${isoD}','${r.key}','${sym}')">Apply ${sym}</button>
+         </div>
+       </div>`:'';
+    let markPills='';
+    CON_MARK_OPTS.forEach(o=>{markPills+=`<span class="pill${o.v===mark?' on':''}" onclick="setMark('${isoD}','${r.key}','${o.v}')">${o.label}</span>`;});
+    const markBox=`<div class="lbl" style="margin-top:10px;margin-bottom:6px;">Marker (on return day)</div><div class="pill-row">${markPills}</div>`;
+    h+=`<div class="srow" style="border-color:var(--sky);"><div class="srow-name">${r.label} — ${S.names[r.key]}</div>
+      <div class="lbl" style="margin-bottom:6px;">Status (leave only)</div><div class="pill-row">${pills}</div>
+      ${rangeBox}${markBox}
+      <button class="btn btn-sky" style="margin-top:10px;width:100%;padding:9px;" onclick="closeModal()">Done</button></div>`;
+  });
+  h+=staffChangeCardHTML(isoD);
+  document.getElementById('mContent').innerHTML=h;
+  document.getElementById('overlay').classList.add('on');
+}
+function setCover(isoDate,key,val){
+  if(!S.over[isoDate])S.over[isoDate]={};
+  const prev=S.over[isoDate][key]||getE(isoDate,key);
+  S.over[isoDate][key]={sym:prev.sym||'',ovt:prev.ovt||'',cover:val.trim().toUpperCase(),ext:prev.ext||'',mark:prev.mark||''};
+  renderRota();renderAudit();autoSave();
+}
+// Set or clear a rotation marker (EOR/SF/AD) without disturbing the leave/day-off status
+function setMark(isoDate,key,mk){
+  if(!S.over[isoDate])S.over[isoDate]={};
+  const prev=S.over[isoDate][key]||getE(isoDate,key);
+  const prevMark=prev.mark||'';
+  S.over[isoDate][key]={sym:prev.sym||'',ovt:prev.ovt||'',cover:prev.cover||'',ext:prev.ext||'',mark:mk};
+  // (EOR)/(SF) mean the doctor leaves the firm after this day — their last day is today,
+  // so the slot goes vacant from tomorrow until it's filled. Consultants don't rotate.
+  const leaving=m=>m==='(EOR)'||m==='(SF)';
+  const isCon=CONS.some(c=>c.key===key);
+  if(!isCon){
+    const nextIso=iso(addDays(new Date(isoDate+'T00:00:00'),1));
+    const inWindow=S.days.some(d=>iso(d.date)===nextIso);
+    if(leaving(mk)&&inWindow){
+      // Vacate from tomorrow — unless a changeover is already booked that day (successor arriving)
+      if(!S.changes[key])S.changes[key]=[];
+      if(!S.changes[key].some(c=>c.from===nextIso)){
+        S.changes[key].push({from:nextIso,name:''});
+        S.changes[key].sort((a,b)=>a.from<b.from?-1:1);
+        reconcileSlot(key);
+      }
+    }else if(leaving(prevMark)&&!leaving(mk)){
+      // Marker cleared — the doctor stays: remove the vacancy we added (only a blank one)
+      if(S.changes[key]){
+        S.changes[key]=S.changes[key].filter(c=>!(c.from===nextIso&&c.name===''));
+        if(!S.changes[key].length)delete S.changes[key];
+        reconcileSlot(key);
+      }
+    }
+  }
+  renderRota();renderAudit();autoSave();
+  if(S.openDay)openDayIso(S.openDay);
+}
+// Public Holiday — day-level flag, not per-person. Whoever actually works that day
+// (regular hours, on duty, or a $ session) picks up the Ⓗ marker automatically.
+function toggleHoliday(isoDate){
+  if(S.holidays[isoDate])delete S.holidays[isoDate];
+  else S.holidays[isoDate]=true;
+  renderRota();renderAudit();autoSave();
+  if(S.openDay)openDayIso(S.openDay);
+}
+// Assume Duties: a NEW permanent team member takes over a vacant slot from this day
+// forward (the counterpart to EOR — "beginning of rotation"). Gets the (AD) marker today
+// and holds the column until their own EOR. No outgoing marker (the slot was already vacant).
+function assumeDuties(isoDate,key){
+  const el=document.getElementById('ad-'+key);
+  if(!el)return;
+  const name=el.value.trim().toUpperCase();
+  if(!name){toast('Enter the new doctor’s name');return;}
+  // Clear any one-day $ session sitting on this exact day for this slot (it's now a real member)
+  if(S.over[isoDate]&&S.over[isoDate][key]&&S.over[isoDate][key].sym==='$'){
+    const p=S.over[isoDate][key];
+    S.over[isoDate][key]={sym:'',ovt:p.ovt||'',cover:'',ext:'',mark:''};
+  }
+  doStaffChange(key,name,isoDate,'');   // changeover into the vacancy; sets (AD) on isoDate
+  toast(`${name} assumes duty ${isoDate.slice(8)}/${isoDate.slice(5,7)} ✓`);
+  openDayIso(isoDate);
+}
+// Emergency duty session ($): a doctor covers a VACANT slot for one day. If their own
+// grade differs from the column, type it in brackets after the name (e.g. "GRANT (SHO)")
+// — it's just part of the name text, no separate field. Consultants are excluded; this
+// only ever appears on an unoccupied position.
+function applyDutySession(isoDate,key){
+  const el=document.getElementById('ext-'+key);
+  if(!el)return;
+  const name=el.value.trim().toUpperCase();
+  if(!name){toast('Enter the covering doctor’s name');return;}
+  if(!S.over[isoDate])S.over[isoDate]={};
+  const prev=S.over[isoDate][key]||{};
+  S.over[isoDate][key]={sym:'$',ovt:prev.ovt||'',cover:'',ext:name,mark:''};
+  renderRota();renderAudit();autoSave();
+  openDayIso(isoDate);
+  toast(`${name} — duty session applied ✓`);
+}
+function clearDutySession(isoDate,key){
+  if(S.over[isoDate]&&S.over[isoDate][key]){
+    const prev=S.over[isoDate][key];
+    S.over[isoDate][key]={sym:'',ovt:prev.ovt||'',cover:'',ext:'',mark:''};
+  }
+  renderRota();renderAudit();autoSave();
+  openDayIso(isoDate);
+  toast('Duty session cleared');
+}
+// Date options from the open day forward (a range can only run forwards)
+function forwardDateOpts(fromIso){
+  return S.days.filter(d=>iso(d.date)>=fromIso).map(d=>{
+    const isoD=iso(d.date);
+    return `<option value="${isoD}">${DAYS[wd(d.date)]} ${d.date.getDate()} ${MON3[d.date.getMonth()]}</option>`;
+  }).join('');
+}
+
+// Apply a leave type from the open day through to a chosen end date, in one action
+function applyLeaveRange(startIso,key,type){
+  const sel=document.getElementById('rgsel-'+key);
+  if(!sel)return;
+  const endIso=sel.value;
+  if(endIso<startIso){toast('End date is before the start date');return;}
+  const isCon=CONS.some(c=>c.key===key);
+  const touchedWeeks=new Set();
+  let count=0;
+  S.days.forEach(d=>{
+    const isoD=iso(d.date);
+    if(isoD<startIso||isoD>endIso)return;
+    if(!isCon&&!nameOn(isoD,key))return; // slot vacant that day — nothing to put leave on
+    if(!S.over[isoD])S.over[isoD]={};
+    const prev=S.over[isoD][key]||{};
+    S.over[isoD][key]={sym:type,ovt:'',cover:prev.cover||'',ext:prev.ext||'',mark:prev.mark||''};
+    count++;
+    touchedWeeks.add(iso(addDays(d.date,-wd(d.date))));
+  });
+  if(!isCon)touchedWeeks.forEach(wkIso=>reconcileWeek(key,wkIso));
+  renderRota();renderAudit();autoSave();
+  openDayIso(startIso);
+  toast(`${type} applied to ${count} day${count===1?'':'s'} ✓`);
+}
+
+// ── STAFF CHANGE, folded into the day modal ──
+function staffChangeCardHTML(isoD){
+  const opts=ROLES.map(r=>{
+    const suffix=r.key==='mo1a'?' (a)':r.key==='mo1b'?' (b)':'';
+    const holder=nameOn(isoD,r.key)||'vacant';
+    return `<option value="${r.key}">${r.label}${suffix} — currently ${holder}</option>`;
+  }).join('');
+  // List every changeover currently on the books, each removable — so a wrong one
+  // (e.g. a name typed into the wrong slot) can be undone.
+  let existing='';
+  ROLES.forEach(r=>{
+    (S.changes[r.key]||[]).forEach(ch=>{
+      const dt=ch.from, dd=`${dt.slice(8)}/${dt.slice(5,7)}`;
+      const who=ch.name||'vacant';
+      existing+=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--line);">
+        <span>${r.label}: → <b>${who}</b> from ${dd}</span>
+        <button class="btn btn-out" style="padding:5px 10px;font-size:11px;color:var(--fail);border-color:var(--fail);" onclick="removeStaffChange('${r.key}','${dt}')">Remove</button></div>`;
+    });
+  });
+  const existingBox=existing?
+    `<div style="margin-top:12px;padding:10px;background:var(--failBg);border-radius:8px;">
+       <div class="lbl" style="margin-bottom:4px;">Staff changes currently on this rota</div>${existing}</div>`:'';
+  return `<div class="srow" style="border-color:var(--navy);border-width:1.5px;">
+    <div class="srow-name" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:0;" onclick="toggleSC()">
+      <span>🔄 Staff Change — permanent, from this day</span><span id="scChev" style="color:var(--muted);">▾</span></div>
+    <div id="scPanel" style="display:none;margin-top:10px;">
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Outgoing doctor's marker lands the day before; the new doctor gets (AD) today and holds the column onward. Blank name = vacant.</p>
+      <div class="field" style="margin-bottom:8px;"><label class="lbl">Position</label><select id="dscRole">${opts}</select></div>
+      <div class="field" style="margin-bottom:8px;"><label class="lbl">New doctor — blank = vacant</label>
+        <input type="text" id="dscName" placeholder="e.g. M. JONES"></div>
+      <div class="field" style="margin-bottom:8px;"><label class="lbl">Outgoing marker (last day)</label>
+        <select id="dscMarker">
+          <option value="(EOR)">(EOR) — End of Rotation</option>
+          <option value="(SF)">(SF) — Switched Firms</option>
+          <option value="">No marker</option>
+        </select></div>
+      <div class="warn-box" id="dscWarn" style="display:none;"></div>
+      <button class="btn btn-navy" style="width:100%;padding:11px;" onclick="applyStaffChangeFromDay()">Apply Staff Change</button>
+      ${existingBox}
+    </div></div>`;
+}
+function toggleSC(){
+  const p=document.getElementById('scPanel'),c=document.getElementById('scChev');
+  if(!p)return;
+  const open=p.style.display!=='none';
+  p.style.display=open?'none':'block';
+  if(c)c.textContent=open?'▾':'▴';
+}
+// Undo a changeover: drop the S.changes entry, clear the (AD) it placed on the changeover
+// day and the (EOR)/(SF) on the day before, then re-balance the slot's day-offs.
+function removeStaffChange(key,fromIso){
+  const arr=S.changes[key]||[];
+  const idx=arr.findIndex(c=>c.from===fromIso);
+  if(idx<0)return;
+  arr.splice(idx,1);
+  if(!arr.length)delete S.changes[key];
+  if(S.over[fromIso]&&S.over[fromIso][key]&&S.over[fromIso][key].mark==='(AD)')S.over[fromIso][key].mark='';
+  const prevIso=iso(addDays(new Date(fromIso+'T00:00:00'),-1));
+  if(S.over[prevIso]&&S.over[prevIso][key]){
+    const m=S.over[prevIso][key].mark;
+    if(m==='(EOR)'||m==='(SF)')S.over[prevIso][key].mark='';
+  }
+  reconcileSlot(key);
+  renderRota();renderAudit();autoSave();
+  if(S.openDay)openDayIso(S.openDay);
+  toast('Staff change removed ✓');
+}
+function applyStaffChangeFromDay(){
+  const fromIso=S.openDay;
+  if(!fromIso)return;
+  const key=document.getElementById('dscRole').value;
+  const newName=document.getElementById('dscName').value.trim().toUpperCase();
+  const marker=document.getElementById('dscMarker').value;
+  const warn=document.getElementById('dscWarn');
+  if(fromIso===iso(S.days[0].date)&&newName){
+    warn.textContent='⚠ This is the first day of the rota — change the name in Setup instead.';
+    warn.style.display='block';return;
+  }
+  doStaffChange(key,newName,fromIso,marker);
+  closeModal();
+  toast(newName?`${newName} assumes duty ${fromIso.slice(8)}/${fromIso.slice(5,7)} ✓`
+               :`Position vacant from ${fromIso.slice(8)}/${fromIso.slice(5,7)} ✓`);
+}
+
+function closeModal(){document.getElementById('overlay').classList.remove('on');S.openDay=null;}
+function maybeClose(e){if(e.target===document.getElementById('overlay'))closeModal();}
+
+// Given a Set of weekday indices (0=Mon..6=Sun) that are duty days in one week,
+// return which cycle letter (A/B/C) matches, or null if it matches none.
+function classifyCycleWeek(wdSet){
+  if(wdSet.size===1&&wdSet.has(2))return'A';
+  if(wdSet.size===3&&wdSet.has(0)&&wdSet.has(2)&&wdSet.has(4))return'B';
+  if(wdSet.size===3&&wdSet.has(2)&&wdSet.has(5)&&wdSet.has(6))return'C';
+  return null;
+}
+function runAudit(){
+  if(!S.built)return[];
+  const issues=[];
+  const weeks=[];
+  for(let i=0;i<S.days.length;i+=7)weeks.push(S.days.slice(i,i+7));
+  // Cycle verification
+  const seq=weeks.map(week=>{
+    const dutyWds=week.filter(d=>d.duty).map(d=>wd(d.date));
+    return classifyCycleWeek(new Set(dutyWds));
+  });
+  if(seq.length>=3){
+    const base=seq.slice(0,3);
+    if(new Set(base).size===3&&!base.includes(null)){
+      seq.forEach((c,i)=>{if(c!==base[i%3])issues.push({w:`Week ${i+1}`,m:`Duty cycle breaks pattern (expected ${base[i%3]}, got ${c||'?'})`});});
+    }
+  }
+  // Weekend-to-Monday constraint: no Week C (Sat+Sun) immediately followed by Week B (Monday duty)
+  for(let i=0;i<seq.length-1;i++){
+    if(seq[i]==='C'&&seq[i+1]==='B')
+      issues.push({w:`Week ${i+1}→${i+2}`,m:`Monday duty cannot follow a Sat+Sun weekend duty — Week C must be followed by Week A`});
+  }
+  // Per-week per-person
+  const ssGot={};ROLES.forEach(r=>ssGot[r.key]=false);
+  weeks.forEach((week,wi)=>{
+    const wl=`Week ${wi+1}`;
+    ROLES.forEach(r=>{
+      // Segment the week by occupant (changeovers/vacancies) — entitlement per occupant:
+      // hold 7 days → 2 off, 6 days → 1 off, 5 or fewer → 0 off. Only DOH cancels an earned day-off.
+      const segs=slotSegments(week,r.key);
+      segs.forEach(seg=>{
+        let stars=0,dstars=0,dohs=0,lvs=0;
+        let hasStar=null,hasDstar=null;
+        seg.days.forEach(d=>{
+          const isoD=iso(d.date);
+          const{sym}=getE(isoD,r.key);
+          if(sym==='*'){stars++;if(d.duty)issues.push({w:wl,m:`${seg.name}: * on duty day ${d.date.getDate()} ${MON3[d.date.getMonth()]}`});hasStar=wd(d.date);}
+          else if(sym==='**'){dstars++;if(d.duty)issues.push({w:wl,m:`${seg.name}: ** on duty day ${d.date.getDate()} ${MON3[d.date.getMonth()]}`});hasDstar=wd(d.date);}
+          else if(sym==='DOH'){if(d.duty)issues.push({w:wl,m:`${seg.name}: DOH on duty day ${d.date.getDate()} ${MON3[d.date.getMonth()]} — use DL`});else dohs++;}
+          else if(['DL','VL','SL','EDL'].includes(sym))lvs++;
+        });
+        if(hasStar===5&&hasDstar===6)ssGot[r.key]=true;
+        const allowance=allowedOffs(seg.days.length);
+        const tot=stars+dstars+dohs;
+        const leaveHeavy=lvs>=3;
+        const ok=leaveHeavy?(tot<=allowance):(tot===allowance);
+        if(!ok){
+          if(tot>allowance)
+            issues.push({w:wl,m:`${seg.name}: ${tot} day(s) off but entitled to ${allowance} (held position ${seg.days.length} of 7 days)`});
+          else
+            issues.push({w:wl,m:`${seg.name}: ${tot} day(s) off — entitled to ${allowance} (held position ${seg.days.length} of 7 days)`});
+        }
+      });
+    });
+    SG_PAIRS.forEach(([p1,p2])=>{
+      week.forEach(d=>{
+        const isoD=iso(d.date);
+        if(!nameOn(isoD,p1)||!nameOn(isoD,p2))return; // vacancy — no clash possible
+        const s1=getE(isoD,p1).sym,s2=getE(isoD,p2).sym;
+        if(['*','**'].includes(s1)&&['*','**'].includes(s2))
+          issues.push({w:wl,m:`${nameOn(isoD,p1)} & ${nameOn(isoD,p2)} both off ${d.date.getDate()} ${MON3[d.date.getMonth()]} — same grade`});
+      });
+    });
+  });
+  // Sat/Sun pair per month — skip slots vacant at month end and staff who changed mid-month
+  ROLES.forEach(r=>{
+    if(ssGot[r.key])return;
+    const lastIso=iso(S.days[S.days.length-1].date);
+    if(!nameOn(lastIso,r.key))return; // vacant slot — no weekend-pair requirement
+    if((S.changes[r.key]||[]).length)return; // changeover slot — partial months exempt
+    issues.push({w:'Month',m:`${S.names[r.key]}: no Saturday+Sunday pair off this month`});
+  });
+  return issues;
+}
+
+function renderAudit(){
+  const issues=runAudit();
+  document.getElementById('tab-audit').textContent=!S.built?'Check':issues.length?`Check (${issues.length})`:'Check ✓';
+  if(!S.built){document.getElementById('auditOut').innerHTML='<div class="empty"><p>Generate first.</p></div>';return;}
+  let h='';
+  if(!issues.length){
+    h=`<div class="a-ok"><strong style="color:var(--pass);font-size:15px;">✓ All checks pass</strong>
+       <p style="font-size:13px;color:var(--muted);margin-top:6px;">Duty cycle verified, 2 days off per person per week, no conflicts, weekend pairs allocated.</p></div>`;
+  }else{
+    h=`<div class="a-fail"><strong style="color:var(--fail);font-size:15px;">✗ ${issues.length} issue${issues.length>1?'s':''} found</strong></div>`;
+    issues.forEach(i=>h+=`<div class="a-issue"><div class="a-w">${i.w}</div><div class="a-m">${i.m}</div></div>`);
+  }
+  document.getElementById('auditOut').innerHTML=h;
+}
+
+// ── EXCEL EXPORT (SheetJS) ──
+function makeExcelBook(){
+  if(!S.built){toast('Generate the rota first');return null;}
+  if(typeof XLSX==='undefined'){
+    toast('Excel library not loaded — downloading CSV instead');
+    downloadCSV();
+    return null;
+  }
+  const boldFont={bold:true,sz:12};
+  const B=(v)=>({v:v===undefined||v===null?'':v,t:'s',s:{font:boldFont}}); // bold cell
+  const P=(v)=>({v:v===undefined||v===null?'':v,t:'s',s:{font:{sz:12}}});   // plain cell
+  const rows=[];
+  rows.push([B(rotaTitle())]);
+  rows.push([B(`${MONTHS[S.month]} ${S.year} Rota`)]);
+  rows.push([P('BOLD = ROSTERED EMERGENCY DUTY (8am-8am) | Plain = regular 8am-4pm')]);
+  rows.push([P('Overtime symbols inline: + = overtime | *+ = OT on Day Off 1 | **+ = OT on Day Off 2')]);
+  rows.push([P('* = DAY OFF 1 worked (Sat rate) | ** = DAY OFF 2 worked (Sun rate) | DOH = Day Off Honoured (stayed home)')]);
+  rows.push([P("DL = Dept Leave | VL = Vacation | SL = Sick Leave | EDL = Emergency Dept Leave | (EOR) = End of Rotation | (SF) = Switched Firms | (AD) = Assumed Duties | (ROD) = Resumption of Duties | $ = emergency duty session (bracketed grade after a name = covering doctor's actual rank, if different)")]);
+  rows.push([P("Ⓗ = Public Holiday worked — appears next to anyone actually working that day, whether on regular 8am-4pm hours or on an emergency duty session")]);
+  rows.push([]);
+  rows.push(['DATE','DAY','INTERN #1','INTERN #2','SHO','MO1','MO1','MO2','CON','CON'].map(x=>B(x)));
+  rows.push(['','','8am-4pm','8am-4pm','8am-4pm','8am-4pm','8am-4pm','8am-4pm','',''].map(x=>P(x)));
+  S.days.forEach((d,i)=>{
+    const w=wd(d.date);
+    if(w===0&&i>0)rows.push([]); // spacer
+    const isoD=iso(d.date);
+    const dateStr=`${String(d.date.getDate()).padStart(2,'0')}-${MON3[d.date.getMonth()]}`;
+    const row=[];
+    // Date & Day — bold on duty days
+    row.push(d.duty?B(dateStr):P(dateStr));
+    row.push(d.duty?B(DAYFULL[w]):P(DAYFULL[w]));
+    ROLES.forEach(r=>{
+      const nm=nameOn(isoD,r.key);
+      if(!nm){
+        const{ext,sym}=getE(isoD,r.key);
+        if(sym==='$'&&ext){const t=`${ext} $${isHoliday(isoD)?' Ⓗ':''}`;row.push(d.duty?B(t):P(t));}
+        else row.push(P(''));
+        return;
+      }
+      const{sym,ovt,cover,mark}=getE(isoD,r.key);
+      const isLv=['DOH','DL','VL','SL','EDL'].includes(sym);
+      // Absence → symbol only (no name, to save space); else name + code. Markers/cover append.
+      const nameCell=cellText(nm,sym,ovt,cover,mark,d.duty,isHoliday(isoD));
+      // Name bold on duty day when working — or when a cover doctor is working the duty
+      row.push((d.duty&&(!isLv||cover))?B(nameCell):P(nameCell));
+    });
+    CONS.forEach(r=>{
+      const{sym,mark}=getE(isoD,r.key);
+      const disp=cellText(S.names[r.key],['DL','VL','SL','EDL'].includes(sym)?sym:'','','',mark,false,isHoliday(isoD));
+      row.push(B(disp)); // CON always bold
+    });
+    rows.push(row);
+  });
+  rows.push([]);
+  rows.push([P('Prepared by:  _______________________'),P(''),P(''),P(''),P(''),P(''),P(''),P(''),P(''),P('Date:  _______________')]);
+
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:11},{wch:14},{wch:20},{wch:20},{wch:20},{wch:20},{wch:20},{wch:20},{wch:14},{wch:16}];
+  ws['!rows']=rows.map(()=>({hpt:17})); // rows suited to the 12pt font
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,`${MON3[S.month]} ${S.year}`);
+  const fname=`${filePrefix()}_${MONTHS[S.month].toUpperCase()}_${S.year}_rota_BW.xlsx`;
+  return {wb,fname};
+}
+
+// CSV fallback — always works, even offline (no library needed)
+function downloadCSV(){
+  if(!S.built){toast('Generate the rota first');return;}
+  const esc=v=>{v=(v==null?'':String(v));return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  const lines=[];
+  lines.push([rotaTitle()].map(esc).join(','));
+  lines.push([`${MONTHS[S.month]} ${S.year} Rota`].map(esc).join(','));
+  lines.push('');
+  lines.push(['DATE','DAY','INTERN #1','INTERN #2','SHO','MO1','MO1','MO2','CON','CON'].map(esc).join(','));
+  S.days.forEach((d,i)=>{
+    const w=wd(d.date);
+    if(w===0&&i>0)lines.push('');
+    const isoD=iso(d.date);
+    const row=[`${String(d.date.getDate()).padStart(2,'0')}-${MON3[d.date.getMonth()]}`,DAYFULL[w]];
+    ROLES.forEach(r=>{
+      const nm=nameOn(isoD,r.key);
+      if(!nm){
+        const{ext,sym}=getE(isoD,r.key);
+        row.push(sym==='$'&&ext?`${ext} $${isHoliday(isoD)?' Ⓗ':''}`:'');
+        return;
+      }
+      const{sym,ovt,cover,mark}=getE(isoD,r.key);
+      row.push(cellText(nm,sym,ovt,cover,mark,d.duty,isHoliday(isoD)));
+    });
+    CONS.forEach(r=>{
+      const{sym,mark}=getE(isoD,r.key);
+      row.push(cellText(S.names[r.key],['DL','VL','SL','EDL'].includes(sym)?sym:'','','',mark,false,isHoliday(isoD)));
+    });
+    lines.push(row.map(esc).join(','));
+  });
+  const blob=new Blob([lines.join('\n')],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`${filePrefix()}_${MONTHS[S.month].toUpperCase()}_${S.year}_rota_BW.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV downloaded ✓');
+}
+
+// ── OVERTIME UPLOAD (Google Form responses spreadsheet) ──
+function normName(s){
+  return String(s||'').toLowerCase().replace(/\bdr\.?\b/g,'').replace(/[.,]/g,' ').replace(/\s+/g,' ').trim();
+}
+// Meaningful tokens only — single-character initials are too weak to match on (§10.4)
+function nameTokens(s){return normName(s).split(' ').filter(t=>t.length>1);}
+// Levenshtein edit distance — for tolerating minor spelling variants (e.g. Catherine/Katherine)
+function editDist(a,b){
+  const m=a.length,n=b.length;
+  if(!m)return n; if(!n)return m;
+  let prev=Array.from({length:n+1},(_,i)=>i),cur=new Array(n+1);
+  for(let i=1;i<=m;i++){
+    cur[0]=i;
+    for(let j=1;j<=n;j++){
+      const cost=a[i-1]===b[j-1]?0:1;
+      cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+cost);
+    }
+    [prev,cur]=[cur,prev];
+  }
+  return prev[n];
+}
+// Do two name-tokens refer to the same word? Exact, substring, or a near-spelling variant.
+function tokensAkin(a,b){
+  if(a===b)return true;
+  if(a.length>=4&&b.length>=4&&(a.includes(b)||b.includes(a)))return true;
+  const mn=Math.min(a.length,b.length);
+  const dist=editDist(a,b);
+  if(mn>=5&&dist<=1)return true;   // e.g. catherine↔katherine, thomson↔thompson
+  if(mn>=8&&dist<=2)return true;
+  return false;
+}
+// Match on ANY meaningful word on either side (§10.4), spelling-tolerant, but an EXACT
+// word match always beats a mere spelling-variant — so a variant on one slot can't
+// override a clean exact match on another. Returns {key} or {key:null, why}.
+function matchStaff(formName){
+  const fTokens=nameTokens(formName);
+  if(!fTokens.length)return{key:null,why:'name is blank or initials only'};
+  const exact=[],fuzzy=[]; let closest=null,closestD=99;
+  const labelOf=k=>{const r=ROLES.find(x=>x.key===k);return r?r.label:k;};
+  ROLES.forEach(r=>{
+    const cand=[S.names[r.key],...((S.changes[r.key]||[]).map(ch=>ch.name))].filter(Boolean);
+    let lvl=0;
+    for(const nm of cand){
+      const sTokens=nameTokens(nm);
+      for(const st of sTokens)for(const ft of fTokens){
+        if(st===ft)lvl=Math.max(lvl,2);
+        else if(tokensAkin(st,ft))lvl=Math.max(lvl,1);
+        const dsum=editDist(st,ft);
+        if(dsum<closestD){closestD=dsum;closest={key:r.key,name:S.names[r.key]};}
+      }
+    }
+    if(lvl===2)exact.push(r.key); else if(lvl===1)fuzzy.push(r.key);
+  });
+  const ux=[...new Set(exact)],uf=[...new Set(fuzzy)];
+  const pool=ux.length?ux:uf;            // exact matches win outright
+  if(pool.length===1)return{key:pool[0]};
+  if(pool.length>1){
+    const who=pool.map(k=>`${labelOf(k)} (${S.names[k]})`).join(' and ');
+    return{key:null,why:`this name is in two positions on your rota — ${who}. Remove it from the slot they don't hold, then re-import.`};
+  }
+  const hint=closest?` — closest rota name is "${closest.name}"; fix the spelling in Setup so they match`:'';
+  return{key:null,why:`name not matched to firm staff${hint}`};
+}
+function isOvertimeTime(h,m){
+  // ≥18:00 OR past midnight 00:00–07:59. 17:59 or earlier is NOT overtime.
+  return h>=18||h<8;
+}
+// Read a DATE ONLY (§10.2) — any time component on this cell is a format artefact, discarded.
+function readOvtDate(v){
+  if(v instanceof Date&&!isNaN(v))return{mo:v.getMonth()+1,d:v.getDate(),y:v.getFullYear()};
+  const s=String(v||'').trim();
+  let m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m)return{mo:+m[2],d:+m[3],y:+m[1]};
+  m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if(m){let y=+m[3];if(y<100)y+=2000;return{mo:+m[1],d:+m[2],y};}
+  m=s.match(/(\d{1,2})\/(\d{1,2})/);
+  if(m)return{mo:+m[1],d:+m[2],y:null};
+  return null;
+}
+// Read the authoritative END OF WORK TIME (§10.2) — Date (1899-based), Excel day-fraction, or "HH:MM".
+function readEndTime(v){
+  if(v==null||v==='')return null;
+  if(v instanceof Date&&!isNaN(v))return{h:v.getHours(),mi:v.getMinutes()};
+  if(typeof v==='number'){
+    const mins=Math.round((v-Math.floor(v))*24*60);
+    return{h:Math.floor(mins/60)%24,mi:mins%60};
+  }
+  const m=String(v).trim().match(/(\d{1,2}):(\d{2})\s*([ap]m)?/i);
+  if(m){let h=+m[1];const mi=+m[2],ap=(m[3]||'').toLowerCase();
+    if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0; return{h,mi};}
+  return null;
+}
+function handleOvtFile(input){
+  const file=input.files&&input.files[0];
+  input.value='';
+  if(!file)return;
+  if(!S.built){toast('Generate the rota first');return;}
+  if(typeof XLSX==='undefined'){toast('Spreadsheet library not loaded — check connection');return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]]; // always the live 'Form Responses 1' first sheet (§10)
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+      processOvtRows(rows);
+    }catch(err){toast('Could not read spreadsheet');}
+  };
+  reader.readAsArrayBuffer(file);
+}
+function processOvtRows(rows){
+  if(!rows.length){toast('Empty spreadsheet');return;}
+  const hdr=rows[0].map(x=>String(x||'').toLowerCase());
+  const findCol=(...keys)=>hdr.findIndex(h=>keys.every(k=>h.includes(k)));
+  let cName=findCol('doctor','name'); if(cName<0)cName=findCol('name');
+  let cODate=findCol('overtime','date');
+  let cTs=findCol('timestamp');
+  let cEndTime=findCol('end of work time'); // authoritative end time (§10.2)
+  if(cName<0||cODate<0){toast('Could not find Name / Overtime Date columns');return;}
+  if(cEndTime<0){toast('Could not find the END OF WORK TIME column');return;}
+
+  const winStart=S.days[0].date, winEnd=S.days[S.days.length-1].date;
+  const applied=[],skipped=[];
+  const processed=new Set(); // one entry per person per date (§10.6)
+
+  for(let i=1;i<rows.length;i++){
+    const row=rows[i];
+    if(!row||row.every(v=>v==null))continue;
+    const rawName=row[cName];
+    if(!rawName)continue;
+
+    // 1) DATE — read date-only from OVERTIME DATE; ignore its midnight artefact (§10.2)
+    const dd=readOvtDate(row[cODate]);
+    if(!dd){skipped.push({n:rawName,why:'unreadable overtime date: "'+String(row[cODate]).slice(0,20)+'"'});continue;}
+
+    // 2) END TIME — read solely from END OF WORK TIME, the authoritative column (§10.2)
+    const et=readEndTime(row[cEndTime]);
+    if(!et){skipped.push({n:rawName,why:'no END OF WORK TIME recorded'});continue;}
+    const tStr=`${String(et.h).padStart(2,'0')}:${String(et.mi).padStart(2,'0')}`;
+    // 18:00 threshold, tested against the real end time (§10.1)
+    if(!isOvertimeTime(et.h,et.mi)){
+      skipped.push({n:rawName,why:`ended ${tStr} — before 18:00, not overtime`});continue;
+    }
+
+    // Resolve the YEAR: explicit year → use it; else anchor to Timestamp's nearest year;
+    // else rota year ±1 within the window. The Timestamp is ONLY for year disambiguation —
+    // never a recency filter (§10.1).
+    let cand,tsDate=null;
+    if(cTs>=0&&row[cTs]!=null){
+      const tv=row[cTs];
+      if(tv instanceof Date&&!isNaN(tv))tsDate=tv;
+      else{const p=readOvtDate(tv);if(p&&p.y)tsDate=new Date(p.y,p.mo-1,p.d);}
+    }
+    if(dd.y){
+      cand=new Date(dd.y,dd.mo-1,dd.d);
+    }else if(tsDate){
+      const tsY=tsDate.getFullYear();let best=null,bestGap=Infinity;
+      [tsY-1,tsY,tsY+1].forEach(y=>{const t=new Date(y,dd.mo-1,dd.d);const g=Math.abs(t-tsDate);if(g<bestGap){bestGap=g;best=t;}});
+      cand=best;
+    }else{
+      cand=new Date(S.year,dd.mo-1,dd.d);
+      if(cand<winStart||cand>winEnd){
+        const a1=new Date(S.year-1,dd.mo-1,dd.d),a2=new Date(S.year+1,dd.mo-1,dd.d);
+        if(a1>=winStart&&a1<=winEnd)cand=a1; else if(a2>=winStart&&a2<=winEnd)cand=a2;
+      }
+    }
+    // 1) inside the coverage window (§10.1)
+    if(cand<winStart||cand>winEnd){
+      skipped.push({n:rawName,why:`${dd.mo}/${dd.d}/${cand.getFullYear()} outside this rota's window`});continue;
+    }
+    const isoD=iso(cand);
+    const dObj=S.days.find(x=>iso(x.date)===isoD);
+    const dayStr=`${DAYS[wd(cand)]} ${cand.getDate()} ${MON3[cand.getMonth()]}`;
+
+    // 3) NOT a duty day — a duty session is already paid; overtime on top double-pays (§10.3)
+    if(dObj&&dObj.duty){
+      skipped.push({n:rawName,why:`${dayStr} is a DUTY day — overtime not payable on a duty session`});continue;
+    }
+
+    // Name match (§10.4) — full-token, ambiguity-aware
+    const mm=matchStaff(rawName);
+    if(!mm.key){skipped.push({n:rawName,why:mm.why});continue;}
+    const key=mm.key;
+
+    const processKey=`${isoD}:${key}`;
+    if(processed.has(processKey)){ // §10.6 — apply first, report the rest
+      skipped.push({n:S.names[key],why:`${dayStr} — duplicate entry, first one already applied`});continue;
+    }
+
+    // Apply to the OvT column only (§10.5). Day-off underneath → *+ / **+.
+    const cur=getE(isoD,key);
+    let ovtSym='+';
+    if(cur.sym==='*')ovtSym='*+';
+    else if(cur.sym==='**')ovtSym='**+';
+    if(!S.over[isoD])S.over[isoD]={};
+    S.over[isoD][key]={sym:cur.sym,ovt:ovtSym,cover:cur.cover||'',ext:cur.ext||'',mark:cur.mark||''};
+    processed.add(processKey);
+    const shown=(normName(rawName)===normName(S.names[key]))?S.names[key]:`${String(rawName).trim()} → ${S.names[key]}`;
+    applied.push({n:shown,d:dayStr,s:ovtSym,t:tStr});
+  }
+
+  renderRota();renderAudit();autoSave();
+  let h=`<div class="a-ok" style="margin-bottom:10px;"><strong style="color:var(--pass);">✓ ${applied.length} overtime entr${applied.length===1?'y':'ies'} applied</strong></div>`;
+  applied.forEach(a=>{h+=`<div style="font-size:12px;padding:6px 10px;border-bottom:1px solid var(--line);">${a.n} — ${a.d} → <b>${a.s}</b> <span style="color:var(--muted);">(ended ${a.t})</span></div>`;});
+  if(skipped.length){
+    h+=`<div class="a-fail" style="margin:12px 0 8px;"><strong style="color:var(--fail);">⚠ ${skipped.length} entr${skipped.length===1?'y':'ies'} skipped — review below</strong></div>`;
+    skipped.forEach(s=>{h+=`<div style="font-size:12px;padding:6px 10px;border-bottom:1px solid var(--line);color:var(--fail);">${s.n}: ${s.why}</div>`;});
+    h+=`<p style="font-size:11px;color:var(--muted);margin-top:8px;">Skipped items can be entered manually by tapping the day on the rota.</p>`;
+  }
+  document.getElementById('ovtContent').innerHTML=h;
+  document.getElementById('ovtOverlay').classList.add('on');
+}
+function closeOvt(){document.getElementById('ovtOverlay').classList.remove('on');}
+
+// ── PDF via print ──
+function buildOutputHTML(){
+  let h=`<div class="ptitle">${escHtml(rotaTitle())}</div>`;
+  h+=`<div class="psub">${MONTHS[S.month]} ${S.year} &nbsp;|&nbsp; ${escHtml(hospitalName())}</div>`;
+  h+=`<div class="pleg-row">`;
+  h+=`<span class="pleg"><b>BOLD ROW</b> = Emergency Duty (8am–8am next day) &nbsp;|&nbsp; Plain row = Regular hours (8am–4pm)</span>`;
+  h+=`<span class="pleg"><b>NAME</b> = No overtime &nbsp;|&nbsp; <b>NAME+</b> = Overtime on regular day &nbsp;|&nbsp; <b>NAME*+</b> = Overtime on Day Off 1 (Sat rate) &nbsp;|&nbsp; <b>NAME**+</b> = Overtime on Day Off 2 (Sun rate)</span>`;
+  h+=`<span class="pleg"><b>*</b> = Day Off 1 worked (Sat rate) &nbsp;|&nbsp; <b>**</b> = Day Off 2 worked (Sun rate) &nbsp;|&nbsp; <b>DOH</b> = Day Off Honoured (stayed home)</span>`;
+  h+=`<span class="pleg"><b>DL</b> = Dept Leave &nbsp;|&nbsp; <b>VL</b> = Vacation Leave &nbsp;|&nbsp; <b>SL</b> = Sick Leave &nbsp;|&nbsp; <b>EDL</b> = Emergency Dept Leave</span>`;
+  h+=`<span class="pleg"><b>(EOR)</b> = End of Rotation &nbsp;|&nbsp; <b>(SF)</b> = Switched Firms &nbsp;|&nbsp; <b>(AD)</b> = Assumed Duties &nbsp;|&nbsp; <b>(ROD)</b> = Resumption of Duties &nbsp;|&nbsp; <b>$</b> = emergency duty session — bracketed grade after the name (e.g. (SHO)) is the covering doctor's actual rank, if different from this column</span>`;
+  h+=`<span class="pleg"><b>Ⓗ</b> = Public Holiday worked — shown next to anyone actually working that day (regular 8am-4pm hours or an emergency duty session)</span>`;
+  h+=`</div>`;
+  h+='<table class="ptable"><thead><tr>';
+  h+='<th>DATE</th><th>DAY</th>';
+  h+='<th>INTERN #1</th><th>INTERN #2</th><th>SHO</th>';
+  h+='<th>MO1</th><th>MO1</th><th>MO2</th>';
+  h+='<th>CON</th><th>CON</th>';
+  h+='</tr></thead><tbody>';
+  S.days.forEach((d,i)=>{
+    const w=wd(d.date);
+    if(w===0&&i>0)h+='<tr class="sep"><td colspan="10"></td></tr>';
+    const isoD=iso(d.date);
+    const cls=d.duty?'duty':'';
+    h+=`<tr class="${cls}">`;
+    const dateStr=`${String(d.date.getDate()).padStart(2,'0')}-${MON3[d.date.getMonth()]}`;
+    h+=`<td class="${d.duty?'b':''}">${dateStr}</td>`;
+    h+=`<td class="${d.duty?'b':''}" style="white-space:nowrap;">${DAYFULL[w]}</td>`;
+    ROLES.forEach(r=>{
+      const nm=nameOn(isoD,r.key);
+      if(!nm){
+        const{ext,sym}=getE(isoD,r.key);
+        if(sym==='$'&&ext)h+=`<td class="nm ${d.duty?'b':''}">${ext} $${isHoliday(isoD)?' Ⓗ':''}</td>`;
+        else h+='<td class="nm"></td>';
+        return;
+      }
+      const{sym,ovt,cover,mark}=getE(isoD,r.key);
+      const isLv=['DOH','DL','VL','SL','EDL'].includes(sym);
+      const nameCell=cellText(nm,sym,ovt,cover,mark,d.duty,isHoliday(isoD));
+      const bold=(d.duty&&(!isLv||cover))?'b':'';
+      h+=`<td class="nm ${bold}">${nameCell}</td>`;
+    });
+    CONS.forEach(r=>{
+      const{sym,mark}=getE(isoD,r.key);
+      const disp=cellText(S.names[r.key],['DL','VL','SL','EDL'].includes(sym)?sym:'','','',mark,false,isHoliday(isoD));
+      h+=`<td class="b">${disp}</td>`;
+    });
+    h+='</tr>';
+  });
+  h+='</tbody></table>';
+  h+=`<div style="margin-top:10px;font-size:10px;display:flex;justify-content:space-between;"><span>Prepared by: ___________________________________</span><span>Date: _______________________</span><span>Approved by: ___________________________________</span></div>`;
+  return h;
+}
+
+function printPDF(){
+  if(!S.built){toast('Generate the rota first');return;}
+  document.getElementById('printArea').innerHTML=buildOutputHTML();
+  window.print();
+}
+
+function renderPreview(){
+  const pv=document.getElementById('pvContent');
+  if(!pv)return;
+  pv.innerHTML=S.built?buildOutputHTML():'<div class="empty"><p>Generate the rota first.</p></div>';
+}
+
+function buildSpec(){
+  if(!S.built)return'Generate first.';
+  const rows=[];
+  S.days.forEach(d=>{
+    const isoD=iso(d.date);
+    const row={date:iso(d.date),day:DAYS[wd(d.date)],inMonth:d.inMonth,duty:d.duty,staff:{}};
+    ROLES.forEach(r=>{const{sym,ovt,mark}=getE(isoD,r.key);row.staff[r.key]={name:nameOn(isoD,r.key),sym,ovt,mark};});
+    rows.push(row);
+  });
+  return JSON.stringify({year:S.year,month:S.month,monthName:MONTHS[S.month],cycle:S.cycle,names:S.names,rows},null,2);
+}
+function copySpec(){
+  const spec=buildSpec();
+  if(navigator.clipboard)navigator.clipboard.writeText(spec).then(()=>toast('Spec copied ✓'));
+  else toast('Copy not supported');
+}
+
+function sk(){return`firmc-${S.year}-${S.month}`;}
+function prevMonthKey(){
+  let y=S.year,m=S.month-1;
+  if(m<0){m=11;y--;}
+  return`firmc-${y}-${m}`;
+}
+function rotaSnapshot(){
+  return {year:S.year,month:S.month,cycle:S.cycle,names:S.names,changes:S.changes,offs:S.offs,over:S.over,holidays:S.holidays,
+    days:S.days.map(d=>({d:iso(d.date),im:d.inMonth,dt:d.duty}))};
+}
+// Silent auto-save — runs after every change so nothing is ever lost
+function autoSave(){
+  if(!S.built)return;
+  try{
+    localStorage.setItem(sk(),JSON.stringify(rotaSnapshot()));
+    localStorage.setItem('firmc-active',JSON.stringify({key:sk(),at:new Date().toISOString()}));
+  }catch(e){}
+}
+// UPDATE: explicit save of the working rota + marks it as the active rota
+function updateRota(){
+  if(!S.built){toast('Generate the rota first');return;}
+  try{
+    localStorage.setItem(sk(),JSON.stringify(rotaSnapshot()));
+    localStorage.setItem('firmc-active',JSON.stringify({key:sk(),at:new Date().toISOString()}));
+    const t=new Date();
+    toast(`Updated ✓ ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`);
+    
+  }catch(e){toast('Update failed');}
+}
+// ACTIVE ROTA: pull up the working rota and continue editing
+// quiet=true (startup): no error toast when nothing is saved yet
+function loadActive(quiet){
+  try{
+    let key=null;
+    const p=localStorage.getItem('firmc-active');
+    if(p)key=JSON.parse(p).key;
+    if(!key||!localStorage.getItem(key)){
+      // fallback: scan for any saved rota
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i);
+        if(k&&k.startsWith('firmc-')&&k!=='firmc-active'){key=k;break;}
+      }
+    }
+    if(!key||!localStorage.getItem(key)){
+      if(!quiet)toast('No active rota in this browser yet — Generate one, then Update');
+      return false;
+    }
+    restoreSnapshot(JSON.parse(localStorage.getItem(key)));
+    goTab('rota');
+    toast(`Active rota loaded: ${MONTHS[S.month]} ${S.year} ✓`);
+    return true;
+  }catch(e){if(!quiet)toast('Could not load active rota');return false;}
+}
+function restoreSnapshot(d){
+  S.year=d.year;S.month=d.month;
+  S.names={...teamDefaults(),...(d.names||{})};S.changes=d.changes||{};S.cycle=d.cycle||'A';S.offs=d.offs||{};S.over=d.over||{};S.holidays=d.holidays||{};
+  // Migrate older saves: rotation markers used to live in `sym`. Move them to `mark`
+  // so they can coexist with leave. (ASSUMED) is the old spelling of (AD).
+  Object.values(S.over).forEach(day=>Object.values(day).forEach(e=>{
+    if(!e)return;
+    if(e.sym==='(ASSUMED)')e.sym='(AD)';
+    if(['(EOR)','(SF)','(AD)'].includes(e.sym)){e.mark=e.sym;e.sym='';}
+    if(e.mark===undefined)e.mark='';
+    if(e.ext===undefined)e.ext='';
+  }));
+  if(d.days){S.days=d.days.map(x=>({date:new Date(x.d+'T00:00:00'),inMonth:x.im,duty:x.dt}));S.built=true;}
+  pickCycle(S.cycle);
+  ALL_EDIT.forEach(r=>{const el=document.getElementById('n-'+r.key);if(el)el.value=S.names[r.key];});
+  document.getElementById('selM').value=S.month;document.getElementById('selY').value=S.year;
+  checkContinuity();
+  renderRota();renderAudit();
+}
+function tryLoad(){
+  try{
+    const raw=localStorage.getItem(sk());
+    if(!raw)return;
+    restoreSnapshot(JSON.parse(raw));
+    toast('Saved rota loaded');
+  }catch(e){}
+}
+// ── Rota working file: save to / load from a real file in your folders ──
+function saveRotaFile(){
+  if(!S.built){toast('Generate the rota first');return;}
+  const blob=new Blob([JSON.stringify(rotaSnapshot(),null,1)],{type:'text/plain;charset=utf-8'});
+  const filename=`${filePrefix()}_${MONTHS[S.month].toUpperCase()}_${S.year}_rota_WORKING.txt`;
+  
+  // Try modern File System Access API (Chrome, Edge)
+  if(window.showSaveFilePicker){
+    (async()=>{
+      try{
+        const handle=await window.showSaveFilePicker({
+          suggestedName:filename,
+          types:[{description:'Text Files',accept:{'text/plain':['.txt']}}]
+        });
+        const writable=await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        toast('Rota file saved ✓');
+        const el=document.getElementById('rotaSaveStatus');
+        if(el){
+          const now=new Date();
+          const t=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+          el.textContent=`Last saved: ${t}`;
+          el.style.color='var(--pass)';
+        }
+      }catch(err){
+        if(err.name!=='AbortError')toast('Save failed: '+err.message);
+      }
+    })();
+  }else{
+    // Fallback: standard download
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Rota file saved to Downloads ✓');
+    const el=document.getElementById('rotaSaveStatus');
+    if(el){
+      const now=new Date();
+      const t=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      el.textContent=`Last saved: ${t} — file in your Downloads folder.`;
+      el.style.color='var(--pass)';
+    }
+  }
+}
+function loadRotaFile(input){
+  const file=input.files&&input.files[0];
+  input.value='';
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const d=JSON.parse(e.target.result);
+      if(!d.days||!d.names){toast('Not a valid rota file');return;}
+      restoreSnapshot(d);
+      autoSave();
+      goTab('rota');
+      toast(`${MONTHS[d.month]} ${d.year} rota loaded — continue editing`);
+    }catch(err){toast('Could not read rota file');}
+  };
+  reader.readAsText(file);
+}
+
+// Reconcile an entire slot after a changeover: every week, every occupant gets
+// exactly their entitlement (7d→2, 6d→1, ≤5d→0), day-offs sitting on their own days.
+function reconcileSlot(key){
+  const weeks=[];
+  for(let i=0;i<S.days.length;i+=7)weeks.push(S.days.slice(i,i+7));
+  weeks.forEach(week=>{
+    const segs=slotSegments(week,key);
+    segs.forEach(seg=>{
+      const allowance=allowedOffs(seg.days.length);
+      // A doctor's first day on the firm (the (AD) day) is a working day — it may never
+      // hold an AUTOMATIC day-off. Clear any that sit on it, and exclude it from allocation.
+      // (Explicit leave the user sets on day one is left untouched — handled via setE, not here.)
+      const isAD=d=>getE(iso(d.date),key).mark==='(AD)';
+      seg.days.forEach(d=>{
+        if(!isAD(d))return;
+        const isoD=iso(d.date);const s=getE(isoD,key).sym;
+        if(s==='*'||s==='**'){
+          if(!S.over[isoD])S.over[isoD]={};
+          const prev=S.over[isoD][key]||{};
+          S.over[isoD][key]={sym:'',ovt:prev.ovt||'',cover:prev.cover||'',ext:prev.ext||'',mark:prev.mark||'(AD)'};
+        }
+      });
+      // DOH within their days consumes entitlement
+      let dohCount=0,leaveCount=0;
+      seg.days.forEach(d=>{
+        const s=getE(iso(d.date),key).sym;
+        if(s==='DOH')dohCount++;
+        else if(['DL','VL','SL','EDL'].includes(s))leaveCount++;
+      });
+      let target=Math.max(0,allowance-dohCount);
+      // Current effective day-offs on their days (never counting an AD day)
+      const offDays=seg.days.filter(d=>{const s=getE(iso(d.date),key).sym;return (s==='*'||s==='**')&&!isAD(d);});
+      // Skill §20: when leave spans 3+ days in a week it absorbs the day-off entitlement —
+      // do NOT manufacture new day-offs on that person's few working days. Keep only any
+      // day-offs that already legitimately sit on their days.
+      if(leaveCount>=3)target=Math.min(target,offDays.length);
+      let finals=offDays.slice(0,target);
+      // Clear any beyond the target
+      offDays.slice(target).forEach(d=>{
+        const isoD=iso(d.date);
+        if(!S.over[isoD])S.over[isoD]={};
+        const prev=S.over[isoD][key]||{};
+        S.over[isoD][key]={sym:'',ovt:prev.ovt||'',cover:prev.cover||'',ext:prev.ext||'',mark:prev.mark||''};
+      });
+      // Allocate more if entitled but short: free non-duty days, avoiding same-grade clashes
+      if(finals.length<target){
+        const mates=SG_PAIRS.find(p=>p.includes(key));
+        const mate=mates?mates.find(k=>k!==key):null;
+        seg.days.forEach(d=>{
+          if(finals.length>=target)return;
+          const isoD=iso(d.date);
+          if(d.duty)return;
+          if(isAD(d))return; // never the first day on the firm
+          if(finals.some(f=>iso(f.date)===isoD))return;
+          const cur=getE(isoD,key).sym;
+          if(cur!=='')return; // occupied by leave/DOH/marker
+          if(mate&&['*','**'].includes(getE(isoD,mate).sym))return; // same-grade stagger
+          finals.push(d);
+        });
+      }
+      // Normalize symbols: earliest = *, second = ** (on their own days)
+      finals.sort((a,b)=>a.date-b.date);
+      finals.forEach((d,idx)=>{
+        const isoD=iso(d.date);
+        if(!S.over[isoD])S.over[isoD]={};
+        const prev=S.over[isoD][key]||{};
+        S.over[isoD][key]={sym:idx===0?'*':'**',ovt:prev.ovt||'',cover:prev.cover||'',ext:prev.ext||'',mark:prev.mark||''};
+      });
+    });
+  });
+}
+
+// ── MID-MONTH STAFF CHANGE (driven from the day modal) ──
+function doStaffChange(key,newName,fromIso,marker){
+  // Record the changeover — blank name = position vacant until further notice
+  if(!S.changes[key])S.changes[key]=[];
+  S.changes[key].push({from:fromIso,name:newName});
+  S.changes[key].sort((a,b)=>a.from<b.from?-1:1);
+  // Outgoing doctor: marker goes in the MARK field so it sits alongside any leave already
+  // on their last day (e.g. VL through End of Rotation → "A. BROWN VL (EOR)").
+  const fromDate=new Date(fromIso+'T00:00:00');
+  const lastIso=iso(addDays(fromDate,-1));
+  if(marker&&S.days.some(d=>iso(d.date)===lastIso)){
+    if(!S.over[lastIso])S.over[lastIso]={};
+    const prev=S.over[lastIso][key]||getE(lastIso,key);
+    S.over[lastIso][key]={sym:prev.sym||'',ovt:prev.ovt||'',cover:prev.cover||'',ext:prev.ext||'',mark:marker};
+  }
+  if(newName){
+    // New doctor: (AD) assumed duties as a marker on their first day. Day one is a WORKING
+    // day — never carry an auto day-off (*/**) or DOH onto it. Explicit leave (VL/DL/SL/EDL)
+    // is preserved if it was set on that day.
+    if(!S.over[fromIso])S.over[fromIso]={};
+    const prevA=S.over[fromIso][key]||getE(fromIso,key);
+    const startSym=['*','**','DOH'].includes(prevA.sym||'')?'':(prevA.sym||'');
+    S.over[fromIso][key]={sym:startSym,ovt:prevA.ovt||'',cover:prevA.cover||'',ext:prevA.ext||'',mark:'(AD)'};
+  }
+  // Re-balance day-offs around the changeover: each occupant earns 7d→2, 6d→1, ≤5d→0
+  reconcileSlot(key);
+  renderRota();renderAudit();autoSave();
+}
+
+// DELETE saved rota for the selected month (with confirmation)
+// FULL RESET — wipe everything back to a blank setup. Unlike Delete, this also clears
+// staff changes and resets names to defaults, so a corrupt rota can't survive.
+function resetRota(){
+  if(!confirm('Reset everything and start a fresh setup?\n\nThis clears the current rota, all staff changes, leave, overtime, day-offs, and covers, resets names to defaults, and removes the saved copy for this month. It cannot be undone.'))return;
+  // Clear every piece of working state
+  S.changes={};S.offs={};S.over={};S.days=[];S.built=false;S.duty=new Set();
+  S.names=teamDefaults();S.cycle='A';S.holidays={};
+  const now=new Date();S.month=now.getMonth();S.year=now.getFullYear();
+  // Remove the saved copy for this month and the active-rota pointer
+  try{
+    localStorage.removeItem(sk());
+    localStorage.removeItem('firmc-active');
+  }catch(e){}
+  // Reset the Setup form to defaults
+  pickCycle('A');
+  buildNamesForm();
+  const mEl=document.getElementById('selM');if(mEl)mEl.value=S.month;
+  const yEl=document.getElementById('selY');if(yEl)yEl.value=S.year;
+  renderRota();renderAudit();
+  const pv=document.getElementById('pvContent');if(pv)pv.innerHTML='';
+  const fo=document.getElementById('finalOut');if(fo)fo.innerHTML='';
+  goTab('setup');
+  toast('Reset — ready for a fresh setup ✓');
+}
+
+function deleteRota(){
+  const label=`${MONTHS[S.month]} ${S.year}`;
+  if(!localStorage.getItem(sk())&&!S.built){toast('No saved rota for '+label);return;}
+  if(!confirm(`Delete the saved rota for ${label}? This erases all edits and cannot be undone.`))return;
+  try{
+    localStorage.removeItem(sk());
+    const p=localStorage.getItem('firmc-active');
+    if(p&&JSON.parse(p).key===sk())localStorage.removeItem('firmc-active');
+  }catch(e){}
+  S.built=false;S.days=[];S.offs={};S.over={};S.holidays={};S.duty=new Set();
+  renderRota();renderAudit();
+  const pv=document.getElementById('pvContent');if(pv)pv.innerHTML='';
+  const fo=document.getElementById('finalOut');if(fo)fo.innerHTML='';
+  goTab('setup');
+  toast(label+' rota deleted');
+}
+
+// FINALIZATION CHECK — pre-submission verification summary
+function finalCheck(){
+  const out=document.getElementById('finalOut');
+  if(!S.built){out.innerHTML='<div class="a-fail"><strong style="color:var(--fail);">Generate the rota first.</strong></div>';return;}
+  const issues=runAudit();
+  const first=S.days[0].date,last=S.days[S.days.length-1].date;
+  const fmt=d=>`${DAYS[wd(d)]} ${d.getDate()} ${MON3[d.getMonth()]}`;
+  let stats=`<div style="font-size:12px;color:var(--muted);line-height:1.8;margin-top:8px;">`;
+  stats+=`Rota: <b>${MONTHS[S.month]} ${S.year}</b><br>`;
+  stats+=`Coverage: <b>${fmt(first)} → ${fmt(last)}</b> (${S.days.length} days, ${S.days.length/7} weeks)<br>`;
+  stats+=`Duty days: <b>${S.days.filter(d=>d.duty).length}</b> · Starts Monday: <b>${wd(first)===0?'Yes ✓':'NO ✗'}</b> · Ends Sunday: <b>${wd(last)===6?'Yes ✓':'NO ✗'}</b>`;
+  stats+=`</div>`;
+  if(issues.length===0){
+    out.innerHTML=`<div class="a-ok"><strong style="color:var(--pass);font-size:15px;">✓ READY FOR SUBMISSION</strong>
+      <p style="font-size:12px;color:var(--muted);margin-top:4px;">All checks pass — duty cycle, day-off allocations, DOH cancellations, same-grade stagger, weekend pairs.</p>${stats}</div>`;
+  }else{
+    let h=`<div class="a-fail"><strong style="color:var(--fail);font-size:15px;">✗ NOT READY — ${issues.length} issue${issues.length>1?'s':''} to fix</strong>${stats}</div>`;
+    issues.forEach(i=>h+=`<div class="a-issue"><div class="a-w">${i.w}</div><div class="a-m">${i.m}</div></div>`);
+    out.innerHTML=h;
+  }
+}
+
+// goTab() — navigation — is defined in pro.js
+
+
+
+// ── Fullscreen toggle ──
+function toggleFS(){
+  const el=document.documentElement;
+  const isFS=document.fullscreenElement||document.webkitFullscreenElement;
+  if(!isFS){
+    if(el.requestFullscreen)el.requestFullscreen();
+    else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
+    else toast('Fullscreen not supported in this browser');
+  }else{
+    if(document.exitFullscreen)document.exitFullscreen();
+    else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+  }
+}
+
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');setTimeout(()=>el.classList.remove('on'),2500);}
+
+// start-up runs from pro.js

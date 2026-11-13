@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B2545">
+<meta name="description" content="Build, check and share the monthly surgical team duty rota.">
+<title>Rota Pro</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button class="brand tap" onclick="goTab('home')" aria-label="Rota Pro home">
+    <img src="icons/icon.svg" alt="" width="32" height="32">
+    <span>Rota <b>Pro</b></span>
+  </button>
+  <div class="topbar-actions">
+    <button class="icon-btn tap" id="installbtn" hidden aria-label="Install app" title="Install app">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M5 19h14"/></svg>
+    </button>
+    <button class="icon-btn tap" id="fsBtn" onclick="toggleFS()" aria-label="Full screen" title="Full screen">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+    </button>
+    <button class="icon-btn tap" onclick="goTab('settings')" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<nav class="stepper" id="stepper" aria-label="Progress" hidden>
+  <button class="step tap" id="tab-setup" onclick="goTab('setup')"><i>1</i><span>Setup</span></button>
+  <span class="step-line"></span>
+  <button class="step tap" id="tab-rota" onclick="goTab('rota')"><i>2</i><span>Rota</span></button>
+  <span class="step-line"></span>
+  <button class="step tap" id="tab-check" onclick="goTab('audit')"><i>3</i><span id="tab-audit">Check</span></button>
+  <span class="step-line"></span>
+  <button class="step tap" id="tab-export" onclick="goTab('export')"><i>4</i><span>Export</span></button>
+</nav>
+
+<input type="file" id="rotaFileInput" style="display:none;" accept=".txt,.json" onchange="loadRotaFile(this)">
+
+<div class="body">
+
+  <!-- HOME -->
+  <div id="pane-home">
+    <div class="hero">
+      <div class="hero-text">
+        <p class="hero-kicker" id="greeting">Good day</p>
+        <h1>The month's rota, <br>built and checked.</h1>
+        <p class="hero-sub" id="hero-team"></p>
+      </div>
+      <button class="btn-hero tap" id="hero-continue" onclick="continueRota()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg>
+        <span id="hero-continue-label">Continue the rota</span>
+      </button>
+      <button class="btn-hero-2 tap" onclick="newMonth()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> New month's rota
+      </button>
+    </div>
+
+    <div class="install-card" id="install-card" hidden></div>
+    <div class="team-alert" id="team-alert" hidden>
+      <b>First, add your team.</b> Enter the names of your interns, SHO, MOs and consultants once. Rota Pro remembers them on this device.
+      <button class="btn btn-sky tap" onclick="goTab('settings')">Add my team</button>
+    </div>
+
+    <div class="tiles">
+      <button class="tile tap" onclick="newMonth()">
+        <span class="tile-ico t-blue"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M12 13v5M9.5 15.5h5"/></svg></span>
+        <b>New month</b><small>Set the month and duty cycle, then generate</small>
+      </button>
+      <button class="tile tap" onclick="document.getElementById('rotaFileInput').click()">
+        <span class="tile-ico t-teal"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
+        <b>Open a rota file</b><small>Continue a rota saved on another device</small>
+      </button>
+      <button class="tile tap" onclick="goTab('settings')">
+        <span class="tile-ico t-slate"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 4a3 3 0 0 1 0 6M21 20a6 6 0 0 0-4-5.6"/></svg></span>
+        <b>Team &amp; settings</b><small>Names, rota title, hospital</small>
+      </button>
+    </div>
+
+    <div class="card howto">
+      <h2>How it works</h2>
+      <ol>
+        <li><b>Setup:</b> choose the month and the duty cycle. Last month's edits on the shared week carry over.</li>
+        <li><b>Rota:</b> Rota Pro shares out the days off. Tap any day for leave, DOH, overtime, covers, holidays or staff changes. Import the overtime spreadsheet.</li>
+        <li><b>Check:</b> the audit confirms the duty cycle, days off and weekend pairs.</li>
+        <li><b>Export:</b> Excel, PDF, print, or share to WhatsApp, Gmail and Drive.</li>
+      </ol>
+      <p class="privacy">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        Rotas and names are kept on this device only. Nothing is sent anywhere unless you share it.
+      </p>
+    </div>
+    <p class="version home-ver"><span id="home-version"></span> · <button class="linkbtn tap" data-update>Check for updates</button></p>
+  </div>
+
+  <!-- SETUP -->
+  <div id="pane-setup" style="display:none;">
+    <h1 class="screen-title">Setup</h1>
+    <p class="screen-sub">Choose the month, check the duty cycle and the team, then generate.</p>
+    <div class="card">
+      <div class="card-h">Rota month &amp; year</div>
+      <div class="info">The rota runs from the <b>last week of the previous month</b> through the <b>first week of the next month</b>, always Monday to Sunday.</div>
+      <div style="display:flex;gap:8px;">
+        <div class="field" style="flex:2;">
+          <label class="lbl" for="selM">Month</label>
+          <select id="selM" onchange="stateChange()">
+            <option value="0">January</option><option value="1">February</option>
+            <option value="2">March</option><option value="3">April</option>
+            <option value="4">May</option><option value="5">June</option>
+            <option value="6">July</option><option value="7">August</option>
+            <option value="8">September</option><option value="9">October</option>
+            <option value="10">November</option><option value="11">December</option>
+          </select>
+        </div>
+        <div class="field" style="flex:1;">
+          <label class="lbl" for="selY">Year</label>
+          <select id="selY" onchange="stateChange()"></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Duty cycle: first full week of the month</div>
+      <p class="hint">Which pattern applies to the first week of the rota month?</p>
+      <p id="cycleAutoNote" class="okline" style="display:none;"></p>
+      <div class="cycle-row">
+        <div class="cyc on tap" id="cyc-A" onclick="pickCycle('A',true)"><span class="cyc-l">A</span><span class="cyc-d">Wed only</span></div>
+        <div class="cyc tap"    id="cyc-B" onclick="pickCycle('B',true)"><span class="cyc-l">B</span><span class="cyc-d">Mon + Wed + Fri</span></div>
+        <div class="cyc tap"    id="cyc-C" onclick="pickCycle('C',true)"><span class="cyc-l">C</span><span class="cyc-d">Wed + Sat + Sun</span></div>
+      </div>
+    </div>
+
+    <div class="card" id="continuityCard">
+      <div class="card-h">Continuity from last month</div>
+      <p class="hint">This rota shares its boundary days with last month's. Edits on those shared dates (leave, markers, $ sessions, public holidays Ⓗ) carry forward when you tap Generate.</p>
+      <div id="continuityStatus" class="status-box">Checking this device for last month's rota…</div>
+      <input type="file" id="prevRotaFileInput" style="display:none;" accept=".txt,.json" onchange="loadPrevRotaForMerge(this)">
+      <button class="btn btn-out btn-block tap" onclick="document.getElementById('prevRotaFileInput').click()">Upload last month's rota file (if it's on another device)</button>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Team for this rota</div>
+      <p class="hint">Filled in from <b>Team &amp; settings</b>. Change a name here for this month only; leave it blank for a vacant position.</p>
+      <div id="namesForm" class="names-grid"></div>
+    </div>
+
+    <button class="btn btn-sky btn-block btn-lg tap" onclick="generate()">Generate rota
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button>
+    <div class="danger-zone">
+      <button class="btn btn-out tap" onclick="resetRota()">Reset &amp; start fresh</button>
+      <button class="btn btn-danger-out tap" onclick="deleteRota()">Delete this month's saved rota</button>
+    </div>
+    <p class="fine">Generate rebuilds the days off (keeping names and staff changes) and re-merges last month's boundary edits. Reset clears everything back to a blank setup. Delete erases the saved copy for this month.</p>
+  </div>
+
+  <!-- ROTA -->
+  <div id="pane-rota" style="display:none;">
+    <h1 class="screen-title" id="rota-title">Rota</h1>
+    <p class="screen-sub" id="rota-sub">Planner view. Duty days are highlighted; tap any cell to edit.</p>
+    <div id="rotaList"><div class="empty"><p>Generate the rota first.</p></div></div>
+    <div id="rotaSaveBar" style="display:none;margin-top:12px;">
+      <div class="card savebar">
+        <div style="flex:1;min-width:160px;">
+          <div class="card-h" style="margin:0;">Save a rota file</div>
+          <div id="rotaSaveStatus" class="fine" style="margin:2px 0 0;text-align:left;">Saved automatically on this device. Save a file to continue on another device.</div>
+        </div>
+        <button class="btn btn-out tap" onclick="saveRotaFile()">Save rota file</button>
+      </div>
+    </div>
+    <div class="nextbar"><button class="btn btn-sky btn-lg tap" onclick="goTab('audit')">Check the rota
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button></div>
+  </div>
+
+  <!-- CHECK (audit + finalization) -->
+  <div id="pane-audit" style="display:none;">
+    <h1 class="screen-title">Check</h1>
+    <p class="screen-sub">Duty cycle, days off, DOH, same-grade clashes and weekend pairs.</p>
+    <div id="auditOut"><div class="empty"><p>Generate the rota to run the checks.</p></div></div>
+    <div class="card">
+      <div class="card-h">Finalization check</div>
+      <p class="hint">Run before submitting: the full audit plus the rota's dates and duty days.</p>
+      <button class="btn btn-navy btn-block tap" onclick="finalCheck()">Run finalization check</button>
+      <div id="finalOut" style="margin-top:10px;"></div>
+    </div>
+    <div class="nextbar"><button class="btn btn-sky btn-lg tap" onclick="goTab('export')">Go to export
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button></div>
+  </div>
+
+  <!-- EXPORT (+ preview) -->
+  <div id="pane-export" style="display:none;">
+    <h1 class="screen-title">Export</h1>
+    <p class="screen-sub" id="export-sub"></p>
+    <div class="export-actions">
+      <button class="btn btn-sky btn-lg tap" onclick="downloadExcel()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg> Download Excel</button>
+      <button class="btn btn-out btn-lg tap" onclick="downloadPdf()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6m0 0l-3-3m3 3l3-3"/></svg> Download PDF</button>
+      <button class="btn btn-out btn-lg tap" onclick="printPDF()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7"/></svg> Print</button>
+    </div>
+
+    <div class="card share-card">
+      <h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg> Share the rota</h2>
+      <p class="share-sub">By email (Gmail, Outlook), WhatsApp, Drive and more.</p>
+      <div class="attach" role="group" aria-labelledby="attach-lbl">
+        <span id="attach-lbl">Include:</span>
+        <label class="chk tap"><input type="checkbox" id="att-pdf"><span>PDF</span></label>
+        <label class="chk tap"><input type="checkbox" id="att-xlsx"><span>Excel</span></label>
+      </div>
+      <button class="btn btn-sky btn-lg btn-block tap" id="sharebtn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg> Share the rota</button>
+      <p class="share-help" id="share-help"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Preview</div>
+      <p class="hint">How the printed rota looks. Scroll sideways for all columns.</p>
+      <div id="pvContent" class="pv"></div>
+    </div>
+
+    <details class="card advanced">
+      <summary>More: move between devices, data for Claude</summary>
+      <div class="info" style="margin-top:12px;">
+        1. Tap <b>Save rota file</b> on this device.<br>
+        2. Move the file to Google Drive (or email it to yourself).<br>
+        3. On the other device, open Rota Pro and tap <b>Open a rota file</b>.
+      </div>
+      <button class="btn btn-out btn-block tap" onclick="saveRotaFile()">Save rota file</button>
+      <button class="btn btn-out btn-block tap" style="margin-top:8px;" onclick="copySpec()">Copy rota data for Claude</button>
+    </details>
+  </div>
+
+  <!-- SETTINGS -->
+  <div id="pane-settings" style="display:none;">
+    <h1 class="screen-title">Team &amp; settings</h1>
+    <p class="screen-sub">Saved on this device. New months start with this team.</p>
+    <div class="card settings">
+      <h2>You</h2>
+      <label class="field"><span class="lbl">Your name (for the greeting)</span><input type="text" id="s-user" autocomplete="name"></label>
+      <h2>Team</h2>
+      <div id="teamForm" class="names-grid"></div>
+      <h2>On the rota</h2>
+      <label class="field"><span class="lbl">Rota title</span><input type="text" id="s-title"></label>
+      <label class="field"><span class="lbl">Hospital</span><input type="text" id="s-hospital"></label>
+      <label class="field"><span class="lbl">File names start with</span><input type="text" id="s-prefix"></label>
+      <button class="btn btn-sky btn-block tap" onclick="saveSettingsForm()">Save</button>
+    </div>
+    <div class="card update-card">
+      <div><h2>Updates</h2><p>Rota Pro updates itself when you open it. You can also check now.</p></div>
+      <button class="btn btn-out tap" id="updatebtn" data-update>Check for updates</button>
+    </div>
+    <div class="card devinfo-card">
+      <h2>About this device</h2>
+      <div class="devinfo" id="devinfo"></div>
+    </div>
+    <p class="version" id="version"></p>
+  </div>
+
+</div>
+
+<!-- DAY MODAL -->
+<div class="overlay" id="overlay" onclick="maybeClose(event)">
+  <div class="mbox" id="mbox">
+    <div class="mhdr">
+      <span class="mtitle" id="mTitle">—</span>
+      <button class="btn btn-out tap" style="padding:7px 14px;font-size:12px;" onclick="closeModal()">Done</button>
+    </div>
+    <p class="msub" id="mSub"></p>
+    <div id="mContent"></div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+
+<input type="file" id="ovtFile" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleOvtFile(this)">
+
+<!-- OVERTIME REVIEW -->
+<div class="overlay" id="ovtOverlay" onclick="if(event.target===this)closeOvt()">
+  <div class="mbox">
+    <div class="mhdr">
+      <span class="mtitle">Overtime review</span>
+      <button class="btn btn-out tap" style="padding:7px 14px;font-size:12px;" onclick="closeOvt()">Close</button>
+    </div>
+    <div id="ovtContent"></div>
+  </div>
+</div>
+
+<dialog class="dlg" id="dlg" aria-labelledby="dlg-title">
+  <h2 id="dlg-title"></h2>
+  <div id="dlg-body"></div>
+  <div class="dlg-actions" id="dlg-actions"></div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script src="vendor/xlsx.bundle.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="app.js"></script>
+<script src="pro.js"></script>
+</body>
+</html>

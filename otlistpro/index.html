@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B2545">
+<meta name="description" content="Turn a Google Calendar printout into the hospital operating theatre list, in Excel or print.">
+<title>OT List Pro</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button class="brand" data-go="home" aria-label="OT List Pro home">
+    <img src="icons/icon.svg" alt="" width="32" height="32">
+    <span>OT List <b>Pro</b></span>
+  </button>
+  <div class="topbar-actions">
+    <button class="icon-btn tap" id="installbtn" hidden aria-label="Install app" title="Install app">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M5 19h14"/></svg>
+    </button>
+    <button class="icon-btn tap" data-go="settings" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<nav class="stepper" id="stepper" aria-label="Progress" hidden>
+  <button class="step tap" data-go="upload"><i>1</i><span>Enter list</span></button>
+  <span class="step-line"></span>
+  <button class="step tap" data-go="review"><i>2</i><span>Review</span></button>
+  <span class="step-line"></span>
+  <button class="step tap" data-go="export"><i>3</i><span>Export</span></button>
+</nav>
+
+<main id="app">
+
+  <!-- ============ HOME ============ -->
+  <section class="screen" id="screen-home">
+    <div class="hero">
+      <div class="hero-text">
+        <p class="hero-kicker" id="greeting">Good day</p>
+        <h1>Your theatre list, <br>ready in a minute.</h1>
+        <p class="hero-sub" id="hero-team"></p>
+      </div>
+      <button class="btn btn-hero tap" data-go="upload">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        New OT list
+      </button>
+    </div>
+
+    <div class="install-card" id="install-card" hidden></div>
+    <div class="tiles">
+      <button class="tile tap" data-start="pdf">
+        <span class="tile-ico t-blue"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
+        <b>Upload a PDF</b>
+        <small>The Google Calendar day printout</small>
+      </button>
+      <button class="tile tap" data-start="word">
+        <span class="tile-ico t-word"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8.5 12l1.5 6 2-4.5 2 4.5 1.5-6"/></svg></span>
+        <b>Upload a Word document</b>
+        <small>A .docx file with the bookings</small>
+      </button>
+      <button class="tile tap" data-start="type">
+        <span class="tile-ico t-teal"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></span>
+        <b>Type it in</b>
+        <small>Type or paste the bookings</small>
+      </button>
+    </div>
+    <button class="settings-link tap" data-go="settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+      Settings: hospital, team, surgeons and sites</button>
+
+    <div class="howto card">
+      <h2>How it works</h2>
+      <ol>
+        <li><b>Enter the list</b> in one of three ways: upload the calendar <b>PDF</b>, upload a <b>Word</b> document, or <b>type</b> it in. Each booking becomes a case, in theatre order.</li>
+        <li><b>Review</b> the cases. Amber <span class="chip chip-check">Check</span> marks are values the app worked out for you.</li>
+        <li><b>Export</b> the hospital list as Excel, or print it.</li>
+      </ol>
+      <p class="privacy">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        Patient details stay on this device. They are never saved or sent anywhere.
+      </p>
+    </div>
+    <p class="version home-ver"><span id="home-version"></span> · <button class="linkbtn tap" data-update>Check for updates</button></p>
+  </section>
+
+  <!-- ============ UPLOAD ============ -->
+  <section class="screen" id="screen-upload" hidden>
+    <h1 class="screen-title">Enter the OT list</h1>
+    <p class="screen-sub">Choose <b>one</b> of the three ways below.</p>
+
+    <div class="modes" role="tablist" aria-label="How to enter the list">
+      <button class="mode tap" role="tab" data-mode="pdf" id="mode-pdf">
+        <span class="mode-ico t-blue"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></span>
+        <b>PDF</b><small>Calendar printout</small></button>
+      <button class="mode tap" role="tab" data-mode="word" id="mode-word">
+        <span class="mode-ico t-word"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8.5 12l1.5 6 2-4.5 2 4.5 1.5-6"/></svg></span>
+        <b>Word</b><small>.docx document</small></button>
+      <button class="mode tap" role="tab" data-mode="type" id="mode-type">
+        <span class="mode-ico t-teal"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></span>
+        <b>Type</b><small>Type or paste</small></button>
+    </div>
+
+    <!-- PDF / Word: file chooser -->
+    <div id="panel-file" class="panel">
+      <ol class="steps-help" id="help-pdf">
+        <li>In Google Calendar, open the theatre day in <b>Day</b> view.</li>
+        <li>Print it and choose <b>Save as PDF</b>.</li>
+        <li>Tap the box below and choose that PDF.</li>
+      </ol>
+      <ol class="steps-help" id="help-word" hidden>
+        <li>Write the list in Word, laid out as in the example below.</li>
+        <li>Save it as a <b>.docx</b> file. For an older <b>.doc</b> file, open it in Word and use <b>Save As → Word Document (.docx)</b>.</li>
+        <li>Tap the box below and choose that file.</li>
+      </ol>
+      <div class="drop tap-soft" id="drop" tabindex="0" role="button" aria-label="Choose the file">
+        <div class="drop-ico"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5l5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div>
+        <b id="drop-title">Tap to choose the PDF</b>
+        <small id="drop-sub">or drag it here</small>
+        <input type="file" id="file" hidden>
+      </div>
+      <p class="pick-help" id="pick-help">Tap the box, then choose the folder where the file is saved.</p>
+    </div>
+
+    <!-- Type: text box -->
+    <div id="panel-type" class="panel" hidden>
+      <p class="type-help">Type each booking as shown in the example below, or paste text copied from another document or message.</p>
+      <textarea id="pastebox" rows="9" placeholder="Mary Brown 45/F Ex bx lipoma back LA Reg # 123456&#10;8am - 9am&#10;&#10;Ann White 38/F Lap chole GA Reg # 445566&#10;9:30am - 11:30am"></textarea>
+    </div>
+
+    <details class="format card" id="format-help">
+      <summary class="tap-soft"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+        How each booking must be written</summary>
+      <p>Each booking needs these, in this order:</p>
+      <ol>
+        <li><b>Patient name</b></li>
+        <li><b>Age/Sex</b>, e.g. <code>45/F</code> or <code>70 M</code>. <i>This is required: entries without it are skipped.</i></li>
+        <li><b>Procedure</b>, e.g. <code>Lap chole</code>, <code>Ex bx lipoma back</code>, <code>RIH mesh repair</code></li>
+        <li><b>Anaesthesia</b> (optional): <code>LA</code>, <code>GA</code> or <code>LA/Sed</code></li>
+        <li><b>Reg #</b>, e.g. <code>Reg # 123456</code>, or <code>Reg # NYR</code> if not yet registered</li>
+        <li><b>Time slot</b>, e.g. <code>8am - 9am</code> or <code>9:30am to 11:30am</code>, on the next line or at the start of the line. The slot length becomes EST (MIN).</li>
+      </ol>
+      <p class="ex-title">Example</p>
+<pre class="example">Mary Brown 45/F Ex bx lipoma back LA Reg # 123456
+8am - 9am
+Ann White 38/F Lap chole GA Reg # 445566
+9:30am - 11:30am</pre>
+      <p class="ex-title">This also works</p>
+<pre class="example">8am - 9am  Mary Brown 45/F Ex bx lipoma back LA Reg # 123456
+9:30am - 11:30am  Ann White 38/F Lap chole GA Reg # 445566</pre>
+      <p>Put the date (e.g. <code>Tue Nov 17, 2026</code>) and site (e.g. <code>FAL OT</code>) anywhere in the text and they're filled in for you. Otherwise set them below.</p>
+    </details>
+
+    <div class="card form-grid">
+      <label class="field">List date
+        <input type="date" id="listdate">
+      </label>
+      <label class="field">Site
+        <select id="site"></select>
+      </label>
+      <label class="field">Session length (min)
+        <input type="number" id="session" min="30" step="15" inputmode="numeric">
+      </label>
+    </div>
+
+    <p class="msg" id="srcmsg" role="status"></p>
+
+    <div class="actionbar">
+      <button class="btn btn-ghost tap" data-go="home">Cancel</button>
+      <button class="btn btn-primary tap" id="parsebtn">Read cases
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button>
+    </div>
+  </section>
+
+  <!-- ============ REVIEW ============ -->
+  <section class="screen" id="screen-review" hidden>
+    <div class="review-head">
+      <div>
+        <h1 class="screen-title" id="review-title">Review cases</h1>
+        <p class="screen-sub" id="review-sub"></p>
+      </div>
+    </div>
+
+    <div class="totals" id="totals"></div>
+
+    <div id="cases" class="cases"></div>
+
+    <button class="btn btn-dashed tap" id="addcase">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Add a case</button>
+
+    <div class="actionbar">
+      <button class="btn btn-ghost tap" data-go="upload">Back</button>
+      <button class="btn btn-primary tap" data-go="export">Continue to export
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5"/></svg></button>
+    </div>
+  </section>
+
+  <!-- ============ EXPORT ============ -->
+  <section class="screen" id="screen-export" hidden>
+    <h1 class="screen-title">Export</h1>
+    <p class="screen-sub" id="export-sub"></p>
+
+    <div class="export-actions">
+      <button class="btn btn-primary btn-lg tap" id="xlsxbtn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg>
+        Download Excel</button>
+      <button class="btn btn-secondary btn-lg tap" id="pdfbtn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6m0 0l-3-3m3 3l3-3"/></svg>
+        Download PDF</button>
+      <button class="btn btn-secondary btn-lg tap" id="printbtn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7"/></svg>
+        Print</button>
+    </div>
+    <p class="filename" id="fname"></p>
+
+    <div class="card email-card">
+      <h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg> Share the list</h2>
+      <p class="share-sub">By email (Gmail, Outlook), WhatsApp, Drive and more.</p>
+      <div class="attach" role="group" aria-labelledby="attach-lbl">
+        <span id="attach-lbl">Include:</span>
+        <label class="chk tap"><input type="checkbox" id="att-xlsx"><span>Excel</span></label>
+        <label class="chk tap"><input type="checkbox" id="att-pdf"><span>PDF</span></label>
+      </div>
+      <button class="btn btn-primary btn-lg tap" id="emailbtn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+        Share the list</button>
+      <p class="email-help" id="email-help"></p>
+    </div>
+
+    <h2 class="preview-title">Preview</h2>
+    <div class="preview-frame"><div class="preview-scale" id="preview"></div></div>
+
+    <div class="actionbar">
+      <button class="btn btn-ghost tap" data-go="review">Back to review</button>
+      <button class="btn btn-secondary tap" id="newlist">New list</button>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="screen" id="screen-settings" hidden>
+    <h1 class="screen-title">Settings</h1>
+    <p class="screen-sub">Saved on this device. They appear on every list you make.</p>
+
+    <div class="card settings">
+      <h2>You</h2>
+      <label class="field">Your name (for the greeting)
+        <input type="text" id="s-user" autocomplete="name"></label>
+
+      <h2>On the list</h2>
+      <label class="field">Header line 1
+        <input type="text" id="s-head1"></label>
+      <label class="field">Header line 2
+        <input type="text" id="s-head2"></label>
+      <label class="field">Surgeons line
+        <input type="text" id="s-surgeons"></label>
+      <label class="field">Team name (for the home screen)
+        <input type="text" id="s-team"></label>
+      <label class="field">Excel file name starts with
+        <input type="text" id="s-prefix"></label>
+
+      <h2>Sites</h2>
+      <label class="field">One per line: <i>site name</i> | <i>words that identify it in the calendar</i>
+        <textarea id="s-sites" rows="3"></textarea></label>
+
+      <h2>Defaults for each case</h2>
+      <div class="form-grid">
+        <label class="field">Ward
+          <input type="text" id="s-ward"></label>
+        <label class="field">Status
+          <select id="s-status"><option>PUBLIC</option><option>PRIVATE</option></select></label>
+        <label class="field">Session length (min)
+          <input type="number" id="s-session" min="30" step="15" inputmode="numeric"></label>
+      </div>
+    </div>
+
+    <div class="actionbar">
+      <button class="btn btn-ghost tap" id="s-reset">Reset to defaults</button>
+      <button class="btn btn-primary tap" id="s-save">Save</button>
+    </div>
+    <div class="card update-card">
+      <div><h2>Updates</h2><p>The app updates itself when you open it. You can also check now.</p></div>
+      <button class="btn btn-secondary tap" id="updatebtn" data-update>Check for updates</button>
+    </div>
+    <div class="card devinfo-card">
+      <h2>About this device</h2>
+      <div class="devinfo" id="devinfo"></div>
+      <button class="btn btn-secondary tap" id="sharetest" style="margin-top:12px; width:100%">Test the share menu</button>
+    </div>
+    <div class="card sharecheck">
+      <h2>Sharing check</h2>
+      <p>Tap each test once. If a share menu opens, just close it. The result shows next to each test.</p>
+      <button class="check-row tap" data-sharetest="pdf"><span>1. A PDF file</span><b class="res">Not tested</b></button>
+      <button class="check-row tap" data-sharetest="pdfmsg"><span>2. A PDF file with a message</span><b class="res">Not tested</b></button>
+      <button class="check-row tap" data-sharetest="txt"><span>3. A text file</span><b class="res">Not tested</b></button>
+      <button class="check-row tap" data-sharetest="png"><span>4. A picture</span><b class="res">Not tested</b></button>
+    </div>
+    <p class="version" id="version"></p>
+  </section>
+
+</main>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<dialog class="dlg" id="dlg" aria-labelledby="dlg-title">
+  <h2 id="dlg-title"></h2>
+  <div id="dlg-body"></div>
+  <div class="dlg-actions" id="dlg-actions"></div>
+</dialog>
+
+<!-- hospital list, rendered for printing only -->
+<div id="printview" aria-hidden="true"></div>
+
+<script src="vendor/pdf.min.js" defer></script>
+<script src="vendor/jspdf.umd.min.js" defer></script>
+<script src="vendor/jspdf.plugin.autotable.min.js" defer></script>
+<script src="app.js" defer></script>
+</body>
+</html>
