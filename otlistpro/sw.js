@@ -1,6 +1,6 @@
 /* OT List Pro service worker: keeps the app working offline.
    Bump CACHE whenever any app file changes, so installed copies pick up the new version. */
-const CACHE = "otlp-1.6.5";
+const CACHE = "otlp-1.6.6";
 const FILES = [
   "./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest",
   "./vendor/pdf.min.js", "./vendor/pdf.worker.min.js",
@@ -9,8 +9,16 @@ const FILES = [
   "./icons/icon-maskable-192.png", "./icons/icon-maskable-512.png", "./icons/apple-touch-icon.png",
 ];
 
+// Fetch every file FRESH when installing a version: skip the browser's own saved copies
+// (cache:"reload") and the web host's (the ?v= tag), so a new version never holds old files.
 self.addEventListener("install", e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));
+  e.waitUntil(caches.open(CACHE).then(c=>Promise.all(FILES.map(async u=>{
+    const plain = new URL(u, self.location).href;
+    const fresh = new URL(u, self.location); fresh.searchParams.set("v", CACHE);
+    const r = await fetch(fresh.href, {cache:"reload"});
+    if(!r.ok) throw new Error("Could not fetch " + u);
+    await c.put(plain, r);
+  }))));
 });
 self.addEventListener("activate", e=>{
   e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
