@@ -330,3 +330,13 @@ textarea{width:100%; min-height:120px; margin-top:8px; padding:12px; border:1.5p
 .check-row .res{font-size:.85rem; color:var(--muted); text-align:right; word-break:break-word;}
 .check-row .res.good{color:var(--green);}
 .check-row .res.bad{color:var(--red);}
+
+/* install card */
+.install-card{display:grid; grid-template-columns:auto 1fr; gap:10px 14px; align-items:start; margin-top:14px; padding:14px 16px; border-radius:14px;
+  background:linear-gradient(135deg,#E3F4F5,#EAF1FB); border:1px solid #B7DDE2;}
+.install-card .ic-ico{width:42px; height:42px; border-radius:12px; display:grid; place-items:center; background:#fff; color:var(--teal-2); box-shadow:var(--shadow-1);}
+.install-card .ic-ico svg{width:22px; height:22px;}
+.install-card .ic-text{display:grid; gap:4px; font-size:.9rem;}
+.install-card .ic-text span{color:var(--muted);}
+.install-card .ic-steps{color:var(--ink) !important; background:#fff; border-radius:10px; padding:8px 10px; border:1px solid var(--line);}
+.install-card .ic-actions{grid-column:1/-1; display:flex; gap:8px; justify-content:flex-end;}

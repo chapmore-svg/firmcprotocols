@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.6.6";
+const APP_VERSION = "1.7.0";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -112,6 +112,7 @@ function renderHome(){
   const part = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   $("greeting").textContent = settings.user ? `${part}, ${settings.user}` : part;
   $("hero-team").textContent = settings.team;
+  renderInstallCard();
 }
 document.querySelectorAll("[data-start]").forEach(b=>b.addEventListener("click", ()=>{ setMode(b.dataset.start); go("upload"); }));
 
@@ -942,6 +943,7 @@ $("emailbtn").addEventListener("click", async ()=>{
   const files = [];
   if(wantX){ const blob = buildXlsx(); if(!blob) return; files.push(new File([blob], fileName("xlsx"), {type:XLSX_MIME})); }
   if(wantP){ const blob = buildPdf();  if(!blob) return; files.push(new File([blob], fileName("pdf"),  {type:"application/pdf"})); }
+  if(await desktopSendChoice(files)) return;
   const ok = files.filter(canShareOne), blocked = files.filter(f=>!canShareOne(f));
 
   // 1. Everything can be shared: open the share menu straight away.
@@ -1076,6 +1078,70 @@ $("s-reset").addEventListener("click", ()=>{
   if(!confirm("Reset all settings to the original Firm C values?")) return;
   settings = Object.assign({}, DEFAULTS); saveSettings(settings); renderSettings(); toast("Settings reset");
 });
+
+/* ============ Install card: shown while the app is open as an ordinary browser tab ============ */
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+const IS_DESKTOP = !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && !IS_IOS;
+function isInstalled(){ return matchMedia("(display-mode: standalone)").matches || navigator.standalone===true; }
+function renderInstallCard(){
+  const el = $("install-card"); if(!el) return;
+  let dismissed = 0; try{ dismissed = +localStorage.getItem("otlp.installDismissed") || 0; }catch(_){}
+  if(isInstalled() || Date.now()-dismissed < 7*864e5){ el.hidden = true; return; }
+  const ua = navigator.userAgent, android = /Android/.test(ua);
+  let steps = "";
+  if(installEvt) steps = "";
+  else if(android && !IS_ANDROID_CHROME) steps = `This page is open in <b>${browserName()}</b>. Open it in <b>Chrome</b>, then tap <b>⋮</b> → <b>Install app</b>.`;
+  else if(android) steps = "In Chrome, tap <b>⋮</b> (top right) → <b>Install app</b>. If you only see <b>Add to Home screen</b>, tap it and choose <b>Install</b>.";
+  else if(IS_IOS) steps = "In Safari, tap the <b>Share</b> button → <b>Add to Home Screen</b>.";
+  else if(/Edg\//.test(ua)) steps = "In Edge, click <b>⋯</b> (top right) → <b>Apps</b> → <b>Install this site as an app</b>.";
+  else steps = "Click the <b>install icon</b> at the right end of the address bar, or <b>⋮</b> → <b>Cast, save and share</b> → <b>Install page as app</b>.";
+  const btn = installEvt ? `<button class="btn btn-sky tap" data-install>Install</button>`
+            : (android && !IS_ANDROID_CHROME) ? `<button class="btn btn-sky tap" data-openchrome>Open in Chrome</button>` : "";
+  el.innerHTML = `<div class="ic-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 7v7m0 0l-3-3m3 3l3-3M10 18h4"/></svg></div>
+    <div class="ic-text"><b>Install OT List Pro as an app</b>
+      <span>It's open as a web page right now, so you see the browser's address bar and menus. Installed, it gets its own icon and a clean full-screen window, and it works offline.</span>
+      ${steps ? `<span class="ic-steps">${steps}</span>` : ""}</div>
+    <div class="ic-actions">${btn}<button class="btn btn-ghost tap" data-install-dismiss>Not now</button></div>`;
+  el.hidden = false;
+}
+function openInChromeAndroid(){
+  location.href = `intent://${location.host}${location.pathname}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(location.href.split("#")[0])};end`;
+}
+document.addEventListener("click", async e=>{
+  if(e.target.closest("[data-install]") && installEvt){ installEvt.prompt(); await installEvt.userChoice; installEvt = null; renderInstallCard(); }
+  if(e.target.closest("[data-install-dismiss]")){ try{ localStorage.setItem("otlp.installDismissed", String(Date.now())); }catch(_){} renderInstallCard(); }
+  if(e.target.closest("[data-openchrome]")) openInChromeAndroid();
+});
+window.addEventListener("beforeinstallprompt", ()=>setTimeout(renderInstallCard, 0));
+window.addEventListener("appinstalled", ()=>setTimeout(renderInstallCard, 0));
+
+/* ============ Computers: send with Gmail in the browser, or the system share menu ============ */
+// The Windows share menu only lists installed apps (Outlook, Mail…), never Gmail, which runs in the browser.
+function gmailComposeUrl(){
+  return "https://mail.google.com/mail/?view=cm&fs=1&tf=1&su=" + encodeURIComponent(emailSubject()) + "&body=" + encodeURIComponent(emailBody());
+}
+async function desktopSendChoice(files){   // true = handled here; false = carry on with the share menu
+  if(!IS_DESKTOP) return false;
+  let last = null; try{ last = localStorage.getItem("otlp.desktopSend"); }catch(_){}
+  const win = /Windows/.test(navigator.userAgent);
+  const gm = {label:"Gmail (in your browser)", value:"gmail"};
+  const sys = {label: win ? "Windows share menu (Outlook, Mail…)" : "Share menu (Mail and other apps)", value:"system"};
+  const opts = last==="system" ? [{...sys, primary:true}, gm] : [{...gm, primary:true}, sys];
+  const c = await choose("How would you like to send it?",
+    `<p><b>Gmail</b> opens in your browser with the subject and message filled in, and you attach the saved file. The <b>${win?"Windows share menu":"share menu"}</b> offers Outlook, Mail and other installed apps.</p>`,
+    [...opts, {label:"Cancel", value:null, ghost:true}]);
+  if(!c) return true;
+  try{ localStorage.setItem("otlp.desktopSend", c); }catch(_){}
+  if(c==="system") return false;
+  const how = await saveFiles(files);
+  if(how==="cancelled") return true;
+  const names = files.map(f=>`<b>${f.name}</b>`).join(" and ");
+  const go = await choose("Now attach it in Gmail",
+    `<p>Saved ${names}${how==="downloaded" ? " to your <b>Downloads</b> folder" : ""}.</p><p>Gmail opens in a new tab with the subject and message filled in. Click the <b>📎 paper-clip</b>, choose the saved file${files.length>1?"s":""}, add who it goes to, and send.</p>`,
+    [{label:"Open Gmail", value:true, primary:true}, {label:"Cancel", value:false, ghost:true}]);
+  if(go) window.open(gmailComposeUrl(), "_blank", "noopener");
+  return true;
+}
 
 /* ============ leaving with an unfinished list ============ */
 window.addEventListener("beforeunload", e=>{ if(cases.length){ e.preventDefault(); e.returnValue = ""; } });

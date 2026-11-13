@@ -2,7 +2,7 @@
    The rota rules (duty cycle, day-offs, audit, overtime import, Excel) live in app.js, unchanged
    from the Firm C Rota app v5.2.1 apart from the settings hooks noted there. */
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
 const $id = id => document.getElementById(id);
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -45,6 +45,7 @@ function showPane(t){
     b.classList.toggle("active", i===idx); b.classList.toggle("done", i<idx);
     b.disabled = i>0 && !S.built;
   });
+  document.body.classList.toggle("wide", t==="rota");   // the planner uses the full screen width
   if(t!=="settings") lastPane = t;
   if(t==="home") renderHome();
   if(t==="setup") buildNamesForm();
@@ -68,6 +69,7 @@ function renderHome(){
   $id("hero-continue-label").textContent = S.built ? `Continue the ${MONTHS[S.month]} ${S.year} rota` : "Start a rota";
   $id("team-alert").hidden = !teamIsEmpty();
   $id("home-version").textContent = "Version " + APP_VERSION;
+  renderInstallCard();
 }
 function titleCase(s){ return String(s).toLowerCase().replace(/\b([a-z])/g, c=>c.toUpperCase()).replace(/\bFirm ([a-z])\b/i, (m,c)=>"Firm "+c.toUpperCase()); }
 function continueRota(){ goTab(S.built ? "rota" : "setup"); }
@@ -123,8 +125,105 @@ generate = async function(){
   _generate();
   if(teamIsEmpty()){ const t = {}; ALL_EDIT.forEach(r=>{ t[r.key] = String(S.names[r.key]||"").toUpperCase(); }); saveTeam(t); }
 };
-const _renderRota = renderRota;
-renderRota = function(){ _renderRota(); updateRotaTitle(); };
+/* ============ the rota as a planner grid ============
+   Same data and rules as before; only the drawing changes. One row per day, one column per position. */
+const LEAVE_CODES = ["DL","VL","SL","EDL"];
+function gridCell(d, r, isCon){
+  const isoD = iso(d.date), hol = isHoliday(isoD);
+  let cls = "gc", main = "", codes = [], sub = "";
+  if(isCon){
+    const {sym,mark} = getE(isoD, r.key);
+    const lv = LEAVE_CODES.includes(sym);
+    cls += " con" + (lv ? " leave" : "");
+    if(lv){ main = sym; } else { main = S.names[r.key] || "—"; if(hol) codes.push("Ⓗ"); }
+    if(mark) codes.push(mark);
+  } else {
+    const nm = nameOn(isoD, r.key);
+    if(!nm){
+      const {ext,sym} = getE(isoD, r.key);
+      if(sym==="$" && ext){ cls += " ext" + (d.duty ? " on-duty" : ""); main = ext; codes.push("$"); if(hol) codes.push("Ⓗ"); }
+      else { cls += " vacant"; main = "vacant"; }
+    } else {
+      const {sym,ovt,cover,mark} = getE(isoD, r.key);
+      const lv = LEAVE_CODES.includes(sym), doh = sym==="DOH";
+      if(lv || doh){
+        cls += doh ? " doh" : " leave";
+        main = sym;
+        if(cover){ sub = `${cover}${d.duty?" $":""}${hol&&d.duty?" Ⓗ":""}`; if(d.duty) cls += " on-duty"; }
+      } else {
+        main = nm;
+        if(sym==="*") cls += " off1"; else if(sym==="**") cls += " off2";
+        if(ovt) cls += " ovt";
+        const st = ovt || sym; if(st) codes.push(st);
+        if(hol) codes.push("Ⓗ");
+        if(d.duty) cls += " on-duty";
+      }
+      if(mark){ codes.push(mark); cls += " marked"; }
+    }
+  }
+  const badge = codes.map(c=>`<i class="cd${c==="Ⓗ"?" h":/^\(/.test(c)?" mk":""}">${escHtml(c)}</i>`).join("");
+  return `<td class="${cls}" data-iso="${isoD}" data-k="${r.key}"><span class="cm">${escHtml(main)}</span>${badge}${sub?`<span class="cs">${escHtml(sub)}</span>`:""}</td>`;
+}
+function rotaStats(){
+  const inMonth = S.days.filter(d=>d.inMonth);
+  let leave = 0, ovt = 0;
+  S.days.forEach(d=>ROLES.concat(CONS).forEach(r=>{ const e = getE(iso(d.date), r.key); if(LEAVE_CODES.includes(e.sym)) leave++; if(e.ovt) ovt++; }));
+  return {duty:inMonth.filter(d=>d.duty).length, issues:runAudit().length, leave, ovt,
+          hol:Object.keys(S.holidays||{}).length, changes:Object.values(S.changes||{}).reduce((a,c)=>a+c.length,0)};
+}
+renderRota = function(){
+  updateRotaTitle();
+  const host = $id("rotaList");
+  if(!S.built){ host.innerHTML = '<div class="empty"><p>Set up the month and tap Generate.</p></div>'; return; }
+  const st = rotaStats();
+  const kpi = (v,l,cls="")=>`<div class="kpi ${cls}"><b>${v}</b><span>${l}</span></div>`;
+  let h = `<div class="ops">
+    <div class="kpis">
+      ${kpi(S.cycle, "cycle wk 1")}${kpi(st.duty, "duty days")}
+      ${kpi(st.issues ? st.issues : "✓", st.issues ? "check issues" : "checks pass", st.issues ? "bad" : "good")}
+      ${kpi(st.leave, "leave days")}${kpi(st.ovt, "overtime")}${kpi(st.hol, "holidays")}${kpi(st.changes, "staff changes")}
+    </div>
+    <div class="ops-actions">
+      <label for="ovtFile" class="btn btn-out tap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5l5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg> Import overtime</label>
+      <button class="btn btn-out tap" onclick="saveRotaFile()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg> Save rota file</button>
+    </div>
+  </div>
+  <div class="legend">
+    <span><i class="sw duty"></i>Duty day</span><span><i class="sw off1"></i>* Day off 1</span><span><i class="sw off2"></i>** Day off 2</span>
+    <span><i class="sw leave"></i>Leave</span><span><i class="sw doh"></i>DOH</span><span><i class="sw ovt"></i>Overtime</span><span><i class="sw vac"></i>Vacant</span>
+    <span class="tip">Tap any cell to edit that day</span>
+  </div>
+  <div class="grid-wrap"><table class="rgrid"><thead><tr><th class="dcol">Date</th>`;
+  ROLES.forEach(r=>{ h += `<th>${r.label}${r.key==="mo1a"?" a":r.key==="mo1b"?" b":""}<small>${escHtml(nameOn(iso(S.days[0].date), r.key)||"vacant")}</small></th>`; });
+  CONS.forEach((r,i)=>{ h += `<th class="conh">CON ${i+1}</th>`; });
+  h += `</tr></thead><tbody>`;
+  for(let i=0; i<S.days.length; i+=7){
+    const week = S.days.slice(i,i+7), a = week[0].date, z = week[week.length-1].date;
+    const cyc = classifyCycleWeek(new Set(week.filter(d=>d.duty).map(d=>wd(d.date))));
+    h += `<tr class="wk"><td colspan="${ROLES.length+CONS.length+1}"><b>Week ${i/7+1}</b> · ${a.getDate()} ${MON3[a.getMonth()]} – ${z.getDate()} ${MON3[z.getMonth()]}${cyc?` · cycle ${cyc}`:""}</td></tr>`;
+    week.forEach(d=>{
+      const isoD = iso(d.date), hol = isHoliday(isoD);
+      h += `<tr class="${d.duty?"duty":""}${d.inMonth?"":" adj"}"><th class="dcol" data-iso="${isoD}">
+        <span class="dd">${DAYS[wd(d.date)]} <b>${d.date.getDate()}</b> ${MON3[d.date.getMonth()]}</span>
+        ${d.duty?'<i class="tag duty">DUTY</i>':""}${hol?'<i class="tag hol">Ⓗ</i>':""}</th>`;
+      ROLES.forEach(r=>{ h += gridCell(d, r, false); });
+      CONS.forEach(r=>{ h += gridCell(d, r, true); });
+      h += `</tr>`;
+    });
+  }
+  h += `</tbody></table></div>`;
+  host.innerHTML = h;
+};
+// Tap a cell: open that day's editor and jump to that person.
+$id("rotaList").addEventListener("click", e=>{
+  const c = e.target.closest("[data-iso]"); if(!c) return;
+  openDayIso(c.dataset.iso);
+  if(c.dataset.k){
+    const idx = ROLES.concat(CONS).findIndex(r=>r.key===c.dataset.k);
+    const row = document.querySelectorAll("#mContent .srow")[idx];
+    if(row){ setTimeout(()=>{ row.scrollIntoView({block:"start", behavior:"smooth"}); row.classList.add("flash"); setTimeout(()=>row.classList.remove("flash"), 1200); }, 60); }
+  }
+});
 
 /* ============ saving files ============ */
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
@@ -351,6 +450,7 @@ $id("sharebtn").addEventListener("click", async ()=>{
   const files = [];
   if(wantP){ const f = buildPdfFile(); if(!f) return; files.push(f); }
   if(wantX){ const f = excelFile(); if(!f) return; files.push(f); }
+  if(await desktopSendChoice(files)) return;
   const ok = files.filter(canShareOne), blocked = files.filter(f=>!canShareOne(f));
   if(!blocked.length){ await shareFiles(files); return; }
   if(ok.length){ await partialShare(ok, blocked); return; }
@@ -368,6 +468,70 @@ $id("sharebtn").addEventListener("click", async ()=>{
     [{label:`Save the ${blN}`, value:true, primary:true},{label:"Cancel", value:null, ghost:true}]);
   if(c) savedToast("Files", await saveFiles(files));
 });
+
+/* ============ Install card: shown while the app is open as an ordinary browser tab ============ */
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+const IS_DESKTOP = !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && !IS_IOS;
+function isInstalled(){ return matchMedia("(display-mode: standalone)").matches || navigator.standalone===true; }
+function renderInstallCard(){
+  const el = $id("install-card"); if(!el) return;
+  let dismissed = 0; try{ dismissed = +localStorage.getItem("rotapro.installDismissed") || 0; }catch(_){}
+  if(isInstalled() || Date.now()-dismissed < 7*864e5){ el.hidden = true; return; }
+  const ua = navigator.userAgent, android = /Android/.test(ua);
+  let steps = "";
+  if(installEvt) steps = "";
+  else if(android && !IS_ANDROID_CHROME) steps = `This page is open in <b>${browserName()}</b>. Open it in <b>Chrome</b>, then tap <b>⋮</b> → <b>Install app</b>.`;
+  else if(android) steps = "In Chrome, tap <b>⋮</b> (top right) → <b>Install app</b>. If you only see <b>Add to Home screen</b>, tap it and choose <b>Install</b>.";
+  else if(IS_IOS) steps = "In Safari, tap the <b>Share</b> button → <b>Add to Home Screen</b>.";
+  else if(/Edg\//.test(ua)) steps = "In Edge, click <b>⋯</b> (top right) → <b>Apps</b> → <b>Install this site as an app</b>.";
+  else steps = "Click the <b>install icon</b> at the right end of the address bar, or <b>⋮</b> → <b>Cast, save and share</b> → <b>Install page as app</b>.";
+  const btn = installEvt ? `<button class="btn btn-sky tap" data-install>Install</button>`
+            : (android && !IS_ANDROID_CHROME) ? `<button class="btn btn-sky tap" data-openchrome>Open in Chrome</button>` : "";
+  el.innerHTML = `<div class="ic-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 7v7m0 0l-3-3m3 3l3-3M10 18h4"/></svg></div>
+    <div class="ic-text"><b>Install Rota Pro as an app</b>
+      <span>It's open as a web page right now, so you see the browser's address bar and menus. Installed, it gets its own icon and a clean full-screen window, and it works offline.</span>
+      ${steps ? `<span class="ic-steps">${steps}</span>` : ""}</div>
+    <div class="ic-actions">${btn}<button class="btn btn-ghost tap" data-install-dismiss>Not now</button></div>`;
+  el.hidden = false;
+}
+function openInChromeAndroid(){
+  location.href = `intent://${location.host}${location.pathname}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(location.href.split("#")[0])};end`;
+}
+document.addEventListener("click", async e=>{
+  if(e.target.closest("[data-install]") && installEvt){ installEvt.prompt(); await installEvt.userChoice; installEvt = null; renderInstallCard(); }
+  if(e.target.closest("[data-install-dismiss]")){ try{ localStorage.setItem("rotapro.installDismissed", String(Date.now())); }catch(_){} renderInstallCard(); }
+  if(e.target.closest("[data-openchrome]")) openInChromeAndroid();
+});
+window.addEventListener("beforeinstallprompt", ()=>setTimeout(renderInstallCard, 0));
+window.addEventListener("appinstalled", ()=>setTimeout(renderInstallCard, 0));
+
+/* ============ Computers: send with Gmail in the browser, or the system share menu ============ */
+// The Windows share menu only lists installed apps (Outlook, Mail…), never Gmail, which runs in the browser.
+function gmailComposeUrl(){
+  return "https://mail.google.com/mail/?view=cm&fs=1&tf=1&su=" + encodeURIComponent(shareSubject()) + "&body=" + encodeURIComponent(shareBody());
+}
+async function desktopSendChoice(files){   // true = handled here; false = carry on with the share menu
+  if(!IS_DESKTOP) return false;
+  let last = null; try{ last = localStorage.getItem("rotapro.desktopSend"); }catch(_){}
+  const win = /Windows/.test(navigator.userAgent);
+  const gm = {label:"Gmail (in your browser)", value:"gmail"};
+  const sys = {label: win ? "Windows share menu (Outlook, Mail…)" : "Share menu (Mail and other apps)", value:"system"};
+  const opts = last==="system" ? [{...sys, primary:true}, gm] : [{...gm, primary:true}, sys];
+  const c = await choose("How would you like to send it?",
+    `<p><b>Gmail</b> opens in your browser with the subject and message filled in, and you attach the saved file. The <b>${win?"Windows share menu":"share menu"}</b> offers Outlook, Mail and other installed apps.</p>`,
+    [...opts, {label:"Cancel", value:null, ghost:true}]);
+  if(!c) return true;
+  try{ localStorage.setItem("rotapro.desktopSend", c); }catch(_){}
+  if(c==="system") return false;
+  const how = await saveFiles(files);
+  if(how==="cancelled") return true;
+  const names = files.map(f=>`<b>${f.name}</b>`).join(" and ");
+  const go = await choose("Now attach it in Gmail",
+    `<p>Saved ${names}${how==="downloaded" ? " to your <b>Downloads</b> folder" : ""}.</p><p>Gmail opens in a new tab with the subject and message filled in. Click the <b>📎 paper-clip</b>, choose the saved file${files.length>1?"s":""}, add who it goes to, and send.</p>`,
+    [{label:"Open Gmail", value:true, primary:true}, {label:"Cancel", value:false, ghost:true}]);
+  if(go) window.open(gmailComposeUrl(), "_blank", "noopener");
+  return true;
+}
 
 /* ============ about this device ============ */
 function renderDevInfo(){

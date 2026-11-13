@@ -62,6 +62,7 @@
       </button>
     </div>
 
+    <div class="install-card" id="install-card" hidden></div>
     <div class="team-alert" id="team-alert" hidden>
       <b>First, add your team.</b> Enter the names of your interns, SHO, MOs and consultants once. Rota Pro remembers them on this device.
       <button class="btn btn-sky tap" onclick="goTab('settings')">Add my team</button>
@@ -161,7 +162,7 @@
   <!-- ROTA -->
   <div id="pane-rota" style="display:none;">
     <h1 class="screen-title" id="rota-title">Rota</h1>
-    <p class="screen-sub">Duty days are highlighted in yellow.</p>
+    <p class="screen-sub" id="rota-sub">Planner view. Duty days are highlighted; tap any cell to edit.</p>
     <div id="rotaList"><div class="empty"><p>Generate the rota first.</p></div></div>
     <div id="rotaSaveBar" style="display:none;margin-top:12px;">
       <div class="card savebar">
