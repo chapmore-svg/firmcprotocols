@@ -321,3 +321,12 @@ textarea{width:100%; min-height:120px; margin-top:8px; padding:12px; border:1.5p
 .pick-help{margin-top:10px; font-size:.88rem; color:var(--muted); text-align:center;}
 .errline code{font-family:ui-monospace,Consolas,monospace; font-size:.82rem; background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:1px 5px; word-break:break-word;}
 .devinfo b{text-align:right; word-break:break-word;}
+/* sharing check */
+.sharecheck{margin-top:16px; display:grid; gap:8px;}
+.sharecheck h2{font-size:.82rem; text-transform:uppercase; letter-spacing:.06em; color:var(--teal-2);}
+.sharecheck p{color:var(--muted); font-size:.88rem;}
+.check-row{display:flex; justify-content:space-between; align-items:center; gap:12px; min-height:48px; padding:10px 14px; border-radius:12px;
+  border:1.5px solid var(--line-2); background:var(--surface); text-align:left; font-weight:600;}
+.check-row .res{font-size:.85rem; color:var(--muted); text-align:right; word-break:break-word;}
+.check-row .res.good{color:var(--green);}
+.check-row .res.bad{color:var(--red);}

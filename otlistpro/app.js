@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.6.3";
+const APP_VERSION = "1.6.4";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -861,7 +861,6 @@ async function tryShare(files){
     catch(e){
       if(e.name==="AbortError") return "closed";   // the person closed the menu
       last = e;
-      if(e.name==="NotAllowedError") break;        // needs a fresh tap; retrying now won't help
     }
   }
   return last;
@@ -1019,6 +1018,36 @@ $("s-save").addEventListener("click", ()=>{
   toast("Settings saved");
   go(lastScreen);
 });
+/* ---- Sharing check: which kinds of file does this device let the app share? ---- */
+function testPdf(){
+  if(window.jspdf){ const d = new window.jspdf.jsPDF(); d.text("OT List Pro sharing test", 20, 20); return d.output("blob"); }
+  return new Blob(["%PDF-1.4\n%%EOF"], {type:"application/pdf"});
+}
+function testPng(){
+  return new Promise(res=>{ const c = document.createElement("canvas"); c.width = c.height = 32;
+    const x = c.getContext("2d"); x.fillStyle = "#0E8F9B"; x.fillRect(0,0,32,32); c.toBlob(b=>res(b), "image/png"); });
+}
+const SHARE_TESTS = {
+  pdf:    async ()=>({files:[new File([testPdf()], "OT_List_test.pdf", {type:"application/pdf"})]}),
+  pdfmsg: async ()=>({files:[new File([testPdf()], "OT_List_test.pdf", {type:"application/pdf"})], title:"OT List test", text:"Sharing test with a message"}),
+  txt:    async ()=>({files:[new File(["OT List Pro sharing test"], "OT_List_test.txt", {type:"text/plain"})]}),
+  png:    async ()=>({files:[new File([await testPng()], "OT_List_test.png", {type:"image/png"})]}),
+};
+const PNG_READY = testPng();   // make the picture in advance, so the tap goes straight to the share menu
+document.addEventListener("click", async e=>{
+  const b = e.target.closest("[data-sharetest]"); if(!b) return;
+  const kind = b.dataset.sharetest, out = b.querySelector(".res");
+  let data;
+  if(kind==="png") data = {files:[new File([await PNG_READY], "OT_List_test.png", {type:"image/png"})]};
+  else data = await SHARE_TESTS[kind]();
+  if(!navigator.share){ out.textContent = "No share menu"; out.className = "res bad"; return; }
+  try{ await navigator.share(data); out.textContent = "✓ Opened"; out.className = "res good"; }
+  catch(err){
+    if(err.name==="AbortError"){ out.textContent = "✓ Opened (closed)"; out.className = "res good"; return; }
+    out.textContent = "✗ " + err.name + ": " + err.message; out.className = "res bad"; noteShareProblem(err);
+  }
+});
+
 $("sharetest").addEventListener("click", async ()=>{
   if(!navigator.share){ toast("This browser has no share menu at all.", null, null, 6000); return; }
   try{ await navigator.share({title:"OT List Pro", text:"Share menu test from OT List Pro"}); toast("The share menu works on this device."); }
