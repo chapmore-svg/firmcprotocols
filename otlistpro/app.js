@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.6.4";
+const APP_VERSION = "1.6.5";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
@@ -854,11 +854,26 @@ function noteShareProblem(e){
 }
 // Try the share menu: first with subject and message, then with the files alone
 // (some devices refuse files + text together). Returns "shared", "closed" or the error.
+// Some devices refuse a file when the subject/message contain certain characters (long dashes,
+// line breaks). Try simpler versions in turn, and remember which one this device accepts.
+const SHARE_STYLES = [
+  {id:"full",     label:"subject and message",                  make:f=>({files:f, title:emailSubject(), text:emailBody()})},
+  {id:"plain",    label:"subject and message (plain hyphens)",  make:f=>({files:f, title:emailSubject().replace(/[–—]/g,"-"), text:emailBody().replace(/[–—]/g,"-")})},
+  {id:"oneline",  label:"subject and message (single line)",    make:f=>({files:f, title:emailSubject().replace(/[–—]/g,"-"), text:emailBody().replace(/[–—]/g,"-").replace(/\s*\n+\s*/g," ")})},
+  {id:"subject",  label:"subject only",                         make:f=>({files:f, title:emailSubject().replace(/[–—]/g,"-")})},
+  {id:"fileonly", label:"file only",                            make:f=>({files:f})},
+];
+function shareStyleHere(){ try{ return localStorage.getItem("otlp.shareStyle"); }catch(_){ return null; } }
 async function tryShare(files){
+  const known = shareStyleHere();
+  const order = known ? [SHARE_STYLES.find(x=>x.id===known), ...SHARE_STYLES.filter(x=>x.id!==known)].filter(Boolean) : SHARE_STYLES;
   let last;
-  for(const data of [{files, title:emailSubject(), text:emailBody()}, {files}]){
-    try{ await navigator.share(data); return "shared"; }
-    catch(e){
+  for(const st of order){
+    try{
+      await navigator.share(st.make(files));
+      try{ localStorage.setItem("otlp.shareStyle", st.id); }catch(_){}
+      return "shared";
+    }catch(e){
       if(e.name==="AbortError") return "closed";   // the person closed the menu
       last = e;
     }
@@ -1005,6 +1020,7 @@ function renderSettings(){
     ["Can attach Excel to email", yes(canShareOne(new File([""],"x.xlsx",{type:XLSX_MIME})))],
     ["“Save as” window for files", yes(!!window.showSaveFilePicker)],
     ["Share menu available", yes(!!navigator.share)],
+    ["Sharing works with", (()=>{ const st = SHARE_STYLES.find(x=>x.id===shareStyleHere()); return st ? st.label : "Not shared yet"; })()],
     ["Last share problem", (()=>{ try{ return localStorage.getItem("otlp.lastShareError") || "None"; }catch(_){ return "None"; } })()],
   ];
   $("devinfo").innerHTML = rows.map(([k,v])=>`<div><span>${k}</span><b>${esc(v)}</b></div>`).join("");
