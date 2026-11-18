@@ -91,7 +91,7 @@ footer{color:var(--grey); font-size:.72rem; text-align:center; margin-top:26px;}
 <header>
   <div>
     <h1>CRH GENSX C OT EXL</h1>
-    <p>Google Calendar printout → WRHA / Cornwall Regional Hospital theatre list · General Surgery Firm C · Dr. Chapman Longmore</p>
+    <p>Google Calendar printout → WRHA / Cornwall Regional Hospital theatre list · General Surgery Firm C</p>
   </div>
   <button id="fullbtn" class="hdr-full" title="Full page view" aria-label="Full page view">&#x26F6;</button>
 </header>
@@ -123,7 +123,7 @@ footer{color:var(--grey); font-size:.72rem; text-align:center; margin-top:26px;}
     </div>
     <div class="rowflex" style="margin-top:12px;">
       <label class="fld" style="flex:1 1 320px;" title="Printed on the list and the Excel file. Remembered on this device.">SURGEONS
-        <input type="text" id="surgeons" style="width:100%">
+        <input type="text" id="surgeons" style="width:100%" placeholder="e.g. Drs. Brown, Smith  et al  (Firm C)">
       </label>
     </div>
     <div class="msg" id="srcmsg">No source loaded yet.</div>
@@ -383,7 +383,7 @@ function updateTotals(){
 }
 
 /* ============ remembered settings (this device only) ============ */
-const DEFAULT_SURGEONS="Drs. Hunter, Longmore  et al  (Firm C)";
+const DEFAULT_SURGEONS="";
 const DEFAULT_SESSION="480";
 function store(k,v){ try{ localStorage.setItem("crhot."+k,v); }catch(e){} }
 function recall(k){ try{ return localStorage.getItem("crhot."+k); }catch(e){ return null; } }

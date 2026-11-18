@@ -2,12 +2,12 @@
    The rota rules (duty cycle, day-offs, audit, overtime import, Excel) live in app.js, unchanged
    from the Firm C Rota app v5.2.1 apart from the settings hooks noted there. */
 
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.1.1";
 const $id = id => document.getElementById(id);
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 /* ============ settings (this device) ============ */
-const PRO_DEFAULTS = {user:"Dr. Longmore", title:"GENERAL SURGERY FIRM C ROTA", hospital:"Cornwall Regional Hospital", prefix:"GenSx_C", attachPdf:"1", attachXlsx:"0"};
+const PRO_DEFAULTS = {user:"", title:"GENERAL SURGERY FIRM C ROTA", hospital:"Cornwall Regional Hospital", prefix:"GenSx_C", attachPdf:"1", attachXlsx:"0"};
 function proSettings(){ try{ return Object.assign({}, PRO_DEFAULTS, JSON.parse(localStorage.getItem("rotapro.settings")||"{}")); }catch(e){ return {...PRO_DEFAULTS}; } }
 function saveProSettings(o){ try{ localStorage.setItem("rotapro.settings", JSON.stringify(o)); }catch(e){} }
 function saveTeam(t){ try{ localStorage.setItem("rotapro.team", JSON.stringify(t)); }catch(e){} }

@@ -3,16 +3,16 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.7.1";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 
 /* ============ settings ============ */
 const DEFAULTS = {
-  user: "Dr. Longmore",
+  user: "",
   head1: "WESTERN REGIONAL HEALTH AUTHORITY",
   head2: "CORNWALL REGIONAL HOSPITAL",
-  surgeons: "Drs. Hunter, Longmore  et al  (Firm C)",
+  surgeons: "",
   team: "General Surgery Firm C · Cornwall Regional Hospital",
   prefix: "Gen_Sx_C_OT_List",
   sites: "FALMOUTH | FAL OT\nCRH | CRH OT",
@@ -111,7 +111,7 @@ function renderHome(){
   const h = new Date().getHours();
   const part = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   $("greeting").textContent = settings.user ? `${part}, ${settings.user}` : part;
-  $("hero-team").textContent = settings.team;
+  $("hero-team").textContent = settings.team + (surgeonsText() ? "" : " · Add your surgeons line in Settings");
   renderInstallCard();
 }
 document.querySelectorAll("[data-start]").forEach(b=>b.addEventListener("click", ()=>{ setMode(b.dataset.start); go("upload"); }));
