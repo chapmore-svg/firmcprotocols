@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B2545">
+<meta name="description" content="Structured colonoscopy and upper GI endoscopy reports, as a branded PDF.">
+<title>Endo Report Pro</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button class="brand tap" onclick="goTab('home')" aria-label="Endo Report Pro home">
+    <img src="icons/icon.svg" alt="" width="32" height="32">
+    <span>Endo Report <b>Pro</b></span>
+  </button>
+  <div class="topbar-actions">
+    <button class="icon-btn tap" id="installbtn" hidden aria-label="Install app" title="Install app">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M5 19h14"/></svg>
+    </button>
+    <button class="icon-btn tap" id="fsBtn" onclick="toggleFullscreen()" aria-label="Full screen" title="Full screen">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+    </button>
+    <button class="icon-btn tap" onclick="goTab('settings')" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- the original app's procedure tabs: kept (hidden) so its code runs unchanged -->
+<div hidden><button id="tabColo"></button><button id="tabOgd"></button></div>
+
+<!-- HOME -->
+<section class="screen" id="screen-home">
+  <div class="hero">
+    <div class="hero-brand"><img id="heroLogo" alt=""><div><p class="hero-kicker" id="greeting">Good day</p><p class="hero-doc" id="heroDoc"></p></div></div>
+    <h1>Endoscopy reports, <br>structured and signed.</h1>
+    <div class="hero-actions">
+      <button class="btn-hero tap" onclick="newReport('colo')">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> New colonoscopy</button>
+      <button class="btn-hero tap" onclick="newReport('ogd')">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> New upper GI (OGD)</button>
+    </div>
+  </div>
+
+  <div class="setup-card" id="setup-card" hidden>
+    <div><b>First, set up your details</b><span>Enter your name, qualifications and logo once. They're printed on every report and kept on this device only.</span></div>
+    <button class="btn primary tap" onclick="goTab('settings')">Set up my details</button>
+  </div>
+  <div class="install-card" id="install-card" hidden></div>
+
+  <div class="card recent">
+    <div class="recent-h"><h2>Recent reports</h2><span class="fine" id="recentNote"></span></div>
+    <div id="recentList"></div>
+  </div>
+
+  <div class="card howto">
+    <h2>How it works</h2>
+    <ol>
+      <li>Tap <b>New colonoscopy</b> or <b>New upper GI</b>.</li>
+      <li>Work down the sections: tap chips, step the sedation doses, add findings segment by segment, import photos.</li>
+      <li><b>Preview</b>, then <b>Save PDF</b> (straight into the patient's folder on a computer, once set up in Settings) or <b>Share</b> it (Gmail, WhatsApp, Drive…).</li>
+    </ol>
+    <p class="privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <span>Reports are saved as you type, on this device only, and nothing is sent anywhere unless you share it. They clear themselves after <span id="keepDaysTxt">30</span> days (change this in Settings). Keep the device screen-locked.</span></p>
+  </div>
+  <p class="version home-ver"><span id="home-version"></span> · <button class="linkbtn tap" data-update>Check for updates</button></p>
+</section>
+
+<!-- REPORT -->
+<section class="screen" id="screen-report" hidden>
+  <div class="report-head">
+    <div>
+      <p class="rh-kind" id="rhKind">Colonoscopy report</p>
+      <h1 class="rh-name" id="rhName">New report</h1>
+    </div>
+    <span class="saved" id="savedState">Saved on this device</span>
+  </div>
+  <main id="formWrap"></main>
+  <div id="previewWrap"></div>
+  <div class="bottombar"><div class="bb-inner">
+    <button class="btn ghost tap" id="btnPreview" onclick="togglePreview()">Preview</button>
+    <button class="btn ghost tap" onclick="shareReport()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg> Share</button>
+    <button class="btn primary tap" onclick="makePDF()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg> Save PDF</button>
+  </div></div>
+</section>
+
+<!-- SETTINGS -->
+<section class="screen" id="screen-settings" hidden>
+  <h1 class="screen-title">Settings</h1>
+  <p class="screen-sub">Saved on this device. They appear on every report.</p>
+  <div class="card settings">
+    <h2>You</h2>
+    <label class="fld"><span>Name as printed</span><input type="text" id="s-name"></label>
+    <label class="fld"><span>Qualifications</span><input type="text" id="s-quals"></label>
+    <label class="fld"><span>Title (report header)</span><input type="text" id="s-title"></label>
+    <label class="fld"><span>Role under the signature</span><input type="text" id="s-signRole"></label>
+    <label class="fld"><span>Name for the greeting</span><input type="text" id="s-greet"></label>
+    <h2>Logo</h2>
+    <div class="logo-row">
+      <img id="logoPreview" alt="Current logo">
+      <div class="logo-actions">
+        <input type="file" id="logoIn" accept="image/png,image/jpeg" hidden>
+        <button class="btn ghost tap" onclick="document.getElementById('logoIn').click()">Choose a new logo</button>
+        <button class="btn ghost tap" id="logoReset">Remove logo</button>
+      </div>
+    </div>
+    <h2>Defaults for new reports</h2>
+    <label class="fld"><span>Facility</span><input type="text" id="s-facility" placeholder="e.g. CRH Endoscopy Suite"></label>
+    <label class="fld"><span>Colonoscope</span><input type="text" id="s-scopeColo" placeholder="e.g. Olympus CF-H190"></label>
+    <label class="fld"><span>Gastroscope</span><input type="text" id="s-scopeOgd" placeholder="e.g. Olympus GIF-H190"></label>
+    <h2>Saved reports</h2>
+    <label class="fld"><span>Clear reports older than (days)</span><input type="number" id="s-keepDays" min="1" max="365" inputmode="numeric"></label>
+    <button class="btn primary tap" onclick="saveSettingsForm()">Save</button>
+  </div>
+  <div class="card" id="folderCard"></div>
+  <div class="card danger">
+    <h2>Delete all saved reports</h2>
+    <p class="fine" style="text-align:left">Removes every report saved on this device. It can't be undone.</p>
+    <button class="btn danger-out tap" onclick="deleteAllReports()">Delete all reports</button>
+  </div>
+  <div class="card update-card">
+    <div><h2>Updates</h2><p>Endo Report Pro updates itself when you open it. You can also check now.</p></div>
+    <button class="btn ghost tap" id="updatebtn" data-update>Check for updates</button>
+  </div>
+  <div class="card devinfo-card"><h2>About this device</h2><div class="devinfo" id="devinfo"></div></div>
+  <p class="version" id="version"></p>
+</section>
+
+<div id="pdfStatus"></div>
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalBox"></div>
+</div>
+<dialog class="dlg" id="dlg" aria-labelledby="dlg-title">
+  <h2 id="dlg-title"></h2>
+  <div id="dlg-body"></div>
+  <div class="dlg-actions" id="dlg-actions"></div>
+</dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="app.js"></script>
+<script src="pro.js"></script>
+</body>
+</html>
