@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#13315C"/><stop offset="1" stop-color="#0B2545"/></linearGradient>
+    <linearGradient id="tk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3CC0C9"/><stop offset="1" stop-color="#0E8F9B"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- calendar -->
+  <rect x="112" y="128" width="288" height="272" rx="30" fill="#FFFFFF"/>
+  <rect x="112" y="128" width="288" height="70" rx="30" fill="#7FD6DE"/>
+  <rect x="112" y="168" width="288" height="30" fill="#7FD6DE"/>
+  <rect x="168" y="96" width="26" height="64" rx="13" fill="#FFFFFF"/>
+  <rect x="318" y="96" width="26" height="64" rx="13" fill="#FFFFFF"/>
+  <!-- day grid: duty days highlighted -->
+  <g fill="#C9D5E3">
+    <rect x="146" y="222" width="44" height="34" rx="8"/><rect x="204" y="222" width="44" height="34" rx="8"/>
+    <rect x="320" y="222" width="44" height="34" rx="8"/>
+    <rect x="146" y="272" width="44" height="34" rx="8"/><rect x="262" y="272" width="44" height="34" rx="8"/>
+    <rect x="320" y="272" width="44" height="34" rx="8"/>
+    <rect x="146" y="322" width="44" height="34" rx="8"/><rect x="204" y="322" width="44" height="34" rx="8"/>
+  </g>
+  <g fill="#F2B84B">
+    <rect x="262" y="222" width="44" height="34" rx="8"/><rect x="204" y="272" width="44" height="34" rx="8"/>
+  </g>
+  <!-- tick badge -->
+  <circle cx="356" cy="370" r="72" fill="url(#tk)" stroke="#0B2545" stroke-width="14"/>
+  <path d="M323 370l23 23 45-46" fill="none" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

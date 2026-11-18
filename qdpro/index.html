@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B2545">
+<meta name="description" content="Prescriptions, referral letters, sick leave, imaging requests and recommendation letters as signed PDFs.">
+<title>Quick Docs Pro</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button class="brand tap" onclick="goTab('home')" aria-label="Quick Docs Pro home"><img src="icons/icon.svg" alt="" width="32" height="32"><span>Quick Docs <b>Pro</b></span></button>
+  <div class="topbar-actions">
+    <button class="icon-btn tap" id="installbtn" hidden aria-label="Install app" title="Install app"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M5 19h14"/></svg></button>
+    <button class="icon-btn tap" onclick="toggleFS()" aria-label="Full screen" title="Full screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+    <button class="icon-btn tap" onclick="goTab('settings')" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </div>
+</header>
+
+<!-- HOME -->
+<section class="screen" id="screen-home">
+  <div class="hero">
+    <div class="hero-brand"><img id="heroLogo" alt="" hidden><div><p class="hero-kicker" id="greeting">Good day</p><p class="hero-doc" id="heroDoc"></p></div></div>
+    <h1>Clinical documents, <br>signed in seconds.</h1>
+  </div>
+  <div class="setup-card" id="setup-card" hidden>
+    <div><b>First, set up your details</b><span>Your name, qualifications, registration number, location, logo and clinics are printed on every document. Enter them once; they're kept on this device only.</span></div>
+    <button class="btn bp tap" onclick="goTab('settings')">Set up my details</button>
+  </div>
+  <div class="install-card" id="install-card" hidden></div>
+  <div class="tiles">
+      <button class="tile tap" onclick="openDoc('rx')"><span class="tile-ico t-teal"><svg viewBox="0 0 24 24"><path d="M5 3h5a4 4 0 0 1 0 8H5zM5 11v10M9 11l9 10M18 12l-6 7"/></svg></span><b>Prescription</b><small>Drugs, doses and repeats</small></button>
+      <button class="tile tap" onclick="openDoc('ref')"><span class="tile-ico t-blue"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 8l8 5 8-5"/></svg></span><b>Referral letter</b><small>To a specialist or unit</small></button>
+      <button class="tile tap" onclick="openDoc('sl')"><span class="tile-ico t-amber"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="17" rx="2"/><path d="M8 2v4M16 2v4M4 10h16M9 15l2 2 4-4"/></svg></span><b>Sick leave</b><small>Certificate for work or school</small></button>
+      <button class="tile tap" onclick="openDoc('img')"><span class="tile-ico t-slate"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3.5"/><path d="M7 5l1.5-2h7L17 5"/></svg></span><b>Imaging request</b><small>CT, ultrasound, MRI, X-ray…</small></button>
+      <button class="tile tap" onclick="openDoc('lor')"><span class="tile-ico t-rose"><svg viewBox="0 0 24 24"><path d="M12 15l-3.5 6 .9-4.1L6 15h4l2-5 2 5h4l-3.4 1.9.9 4.1z"/><circle cx="12" cy="7" r="4"/></svg></span><b>Recommendation</b><small>Letter for a person</small></button>
+  </div>
+  <div class="card howto">
+    <h2>How it works</h2>
+    <ol>
+      <li>Choose a document and fill it in. It's saved as a draft on this device as you type.</li>
+      <li>Tap <b>Preview</b>. Sign with your finger or mouse, or use your saved signature.</li>
+      <li><b>Save PDF</b> (into the patient's folder on a computer, once set up in Settings), <b>Share</b> (Gmail, WhatsApp, Drive…) or <b>Print</b>.</li>
+    </ol>
+    <p class="privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <span>Your details, signature and drafts stay on this device; nothing is sent anywhere unless you share it. Keep the device screen-locked.</span></p>
+  </div>
+  <p class="version home-ver"><span id="home-version"></span> · <button class="linkbtn tap" data-update>Check for updates</button></p>
+</section>
+
+<!-- DOCUMENT FORMS + PREVIEW (the original app's forms) -->
+<section class="screen" id="screen-doc" hidden>
+  <div class="doc-head"><div><p class="dh-kind" id="dhKind">Prescription</p><h1 class="dh-name" id="dhName">New document</h1></div><span class="saved" id="savedState">Draft saved on this device</span></div>
+  <div id="main">
+
+<!-- ═══ PRESCRIPTION ═══ -->
+<div id="tab-rx" class="tc active">
+  <div class="card"><div class="ch">&#128100; Patient Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>First Name</label><input id="rx-fn" placeholder="First name"></div><div class="f"><label>Last Name</label><input id="rx-ln" placeholder="Last name"></div></div>
+    <div class="fr t"><div class="f"><label>Date of Birth</label><input type="date" id="rx-dob" oninput="calcAge('rx')" onchange="calcAge('rx')" onblur="calcAge('rx')"></div><div class="f"><label>Age</label><input id="rx-age" readonly style="background:#f9f9f9"></div><div class="f"><label>Sex</label><select id="rx-sex"><option value="">Select</option><option>Male</option><option>Female</option></select></div></div>
+    <div class="fr"><div class="f"><label>Date</label><input type="date" id="rx-date"></div><div class="f"><label>NHI / ID</label><input id="rx-nhi" placeholder="Optional"></div></div>
+    <div class="f" style="margin-bottom:0"><label>Clinic / Venue</label><div class="chips" id="rx-chips"></div><input id="rx-clinic" placeholder="Or type venue" style="margin-top:6px"></div>
+  </div></div>
+  <div class="card"><div class="ch sky">&#128138; Drugs</div><div class="cb">
+    <div id="rx-list">
+      <div class="rxi"><div class="rxn">Drug 1</div>
+        <div class="fr"><div class="f"><label>Drug Name</label><input class="dn" placeholder="e.g. Diclofenac (Voltaren) Gel"></div><div class="f"><label>Dose / Strength</label><input class="dd2" placeholder="e.g. 1%"></div></div>
+        <div class="fr t"><div class="f"><label>Route</label><input class="dr2" placeholder="e.g. Topical"></div><div class="f"><label>Frequency</label><input class="df" placeholder="e.g. BD"></div><div class="f"><label>Duration</label><input class="du" placeholder="e.g. 1 week"></div></div>
+        <div class="fr"><div class="f"><label>Repeat</label><input class="drp" placeholder="e.g. x1 / None"></div><div class="f"><label>Instructions</label><input class="dnt" placeholder="e.g. Apply thin layer"></div></div>
+      </div>
+    </div>
+    <button class="btn bo bsm" onclick="addDrug()">+ Add Drug</button>
+    <button class="btn bp bb" onclick="gen('rx')">Preview Prescription</button>
+    <button class="btn bo bb" style="margin-top:6px" onclick="clr('rx')">&#10005; Clear</button>
+  </div></div>
+</div>
+
+<!-- ═══ REFERRAL ═══ -->
+<div id="tab-ref" class="tc">
+  <div class="card"><div class="ch">&#128100; Patient Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>First Name</label><input id="ref-fn" placeholder="First name"></div><div class="f"><label>Last Name</label><input id="ref-ln" placeholder="Last name"></div></div>
+    <div class="fr t"><div class="f"><label>Date of Birth</label><input type="date" id="ref-dob" oninput="calcAge('ref')" onchange="calcAge('ref')" onblur="calcAge('ref')"></div><div class="f"><label>Age</label><input id="ref-age" readonly style="background:#f9f9f9"></div><div class="f"><label>Sex</label><select id="ref-sex"><option value="">Select</option><option>Male</option><option>Female</option></select></div></div>
+    <div class="fr"><div class="f"><label>Date</label><input type="date" id="ref-date"></div><div class="f"><label>NHI / ID</label><input id="ref-nhi" placeholder="Optional"></div></div>
+    <div class="f" style="margin-bottom:0"><label>Referring From</label><div class="chips" id="ref-chips"></div><input id="ref-clinic" placeholder="Or type venue" style="margin-top:6px"></div>
+  </div></div>
+  <div class="card"><div class="ch sky">&#128232; Referral Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>Specialty</label><input id="ref-spec" placeholder="e.g. Cardiology, Vascular Surgery"></div><div class="f"><label>Doctor / Unit</label><input id="ref-doc" placeholder="e.g. Dr. Smith"></div></div>
+    <div class="fr"><div class="f"><label>Facility</label><input id="ref-fac" placeholder="e.g. Cornwall Regional Hospital, KPH"></div><div class="f"><label>Urgency</label><select id="ref-urg"><option value="Routine">Routine</option><option value="Urgent">Urgent</option><option value="Emergency">Emergency</option></select></div></div>
+    <div class="fr s"><div class="f"><label>Diagnosis / Chief Complaint</label><input id="ref-dx" placeholder="e.g. Right inguinal hernia"></div></div>
+    <div class="fr s"><div class="f"><label>History &amp; Examination Findings</label><textarea id="ref-hx" placeholder="Brief relevant history and examination findings..."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Investigations Done</label><textarea id="ref-inv" placeholder="e.g. USS abdomen — right inguinal hernia confirmed. FBC normal."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Management So Far</label><textarea id="ref-mgmt" placeholder="e.g. Analgesia, conservative management..."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Specific Request / Clinical Question</label><textarea id="ref-req" placeholder="e.g. Please assess and advise re: surgical management."></textarea></div></div>
+    <button class="btn bp bb" onclick="gen('ref')">Preview Referral</button>
+    <button class="btn bo bb" style="margin-top:6px" onclick="clr('ref')">&#10005; Clear</button>
+  </div></div>
+</div>
+
+<!-- ═══ SICK LEAVE ═══ -->
+<div id="tab-sl" class="tc">
+  <div class="card"><div class="ch">&#128100; Patient Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>First Name</label><input id="sl-fn" placeholder="First name"></div><div class="f"><label>Last Name</label><input id="sl-ln" placeholder="Last name"></div></div>
+    <div class="fr t"><div class="f"><label>Date of Birth</label><input type="date" id="sl-dob" oninput="calcAge('sl')" onchange="calcAge('sl')" onblur="calcAge('sl')"></div><div class="f"><label>Age</label><input id="sl-age" readonly style="background:#f9f9f9"></div><div class="f"><label>Sex</label><select id="sl-sex"><option value="">Select</option><option>Male</option><option>Female</option></select></div></div>
+    <div class="fr"><div class="f"><label>Date Seen</label><input type="date" id="sl-date"></div><div class="f"><label>NHI / ID</label><input id="sl-nhi" placeholder="Optional"></div></div>
+    <div class="f" style="margin-bottom:0"><label>Clinic / Venue</label><div class="chips" id="sl-chips"></div><input id="sl-clinic" placeholder="Or type venue" style="margin-top:6px"></div>
+  </div></div>
+  <div class="card"><div class="ch sky">&#128221; Sick Leave Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>From Date</label><input type="date" id="sl-from"></div><div class="f"><label>To Date</label><input type="date" id="sl-to"></div></div>
+    <div class="fr s"><div class="f"><label>Reason (general terms)</label><input id="sl-reason" placeholder="e.g. Medical condition requiring rest"></div></div>
+    <div class="fr s"><div class="f"><label>Employer / Organisation (optional)</label><input id="sl-emp" placeholder="e.g. Ministry of Health"></div></div>
+    <button class="btn bp bb" onclick="gen('sl')">Preview Sick Leave</button>
+    <button class="btn bo bb" style="margin-top:6px" onclick="clr('sl')">&#10005; Clear</button>
+  </div></div>
+</div>
+
+<!-- ═══ IMAGING REQUEST ═══ -->
+<div id="tab-img" class="tc">
+  <div class="card"><div class="ch">&#128100; Patient Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>First Name</label><input id="img-fn" placeholder="First name"></div><div class="f"><label>Last Name</label><input id="img-ln" placeholder="Last name"></div></div>
+    <div class="fr t"><div class="f"><label>Date of Birth</label><input type="date" id="img-dob" oninput="calcAge('img')" onchange="calcAge('img')" onblur="calcAge('img')"></div><div class="f"><label>Age</label><input id="img-age" readonly style="background:#f9f9f9"></div><div class="f"><label>Sex</label><select id="img-sex"><option value="">Select</option><option>Male</option><option>Female</option></select></div></div>
+    <div class="fr"><div class="f"><label>Date</label><input type="date" id="img-date"></div><div class="f"><label>NHI / ID</label><input id="img-nhi" placeholder="Optional"></div></div>
+    <div class="f" style="margin-bottom:0"><label>Requesting From</label><div class="chips" id="img-chips"></div><input id="img-clinic" placeholder="Or type venue" style="margin-top:6px"></div>
+  </div></div>
+  <div class="card"><div class="ch sky">&#128301; Imaging Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>Modality</label><select id="img-mod"><option value="">Select modality</option><option>CT Scan</option><option>Ultrasound</option><option>MRI</option><option>X-Ray</option><option>Mammogram</option><option>Sonomammogram</option><option>PET Scan</option><option>Nuclear Medicine</option><option>Fluoroscopy</option><option>Angiogram</option></select></div><div class="f"><label>Region / Area</label><input id="img-region" placeholder="e.g. Abdomen and Pelvis"></div></div>
+    <div class="fr"><div class="f"><label>Contrast</label><select id="img-contrast"><option value="">Not applicable</option><option>With IV contrast</option><option>Without contrast</option><option>With and without IV contrast</option><option>With oral contrast</option><option>With oral and IV contrast</option></select></div><div class="f"><label>Priority</label><select id="img-pri"><option>Routine</option><option>Urgent</option><option>Emergency</option></select></div></div>
+    <div class="fr s"><div class="f"><label>Clinical Indication / History</label><textarea id="img-ind" placeholder="Brief clinical history and relevant findings..."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Clinical Question</label><textarea id="img-q" placeholder="What are you querying? e.g. ? Malignancy. ? Lumbar-sacral injury. ? Choledocholithiasis."></textarea></div></div>
+    <button class="btn bp bb" onclick="gen('img')">Preview Imaging Request</button>
+    <button class="btn bo bb" style="margin-top:6px" onclick="clr('img')">&#10005; Clear</button>
+  </div></div>
+</div>
+
+<!-- ═══ LETTER OF RECOMMENDATION ═══ -->
+<div id="tab-lor" class="tc">
+  <div class="card"><div class="ch sky">&#127885; Letter of Recommendation</div><div class="cb">
+    <div class="fr"><div class="f"><label>Recipient Name (optional)</label><input id="lor-to" placeholder="e.g. To Whom It May Concern / Dear Sir/Madam"></div><div class="f"><label>Date</label><input type="date" id="lor-date"></div></div>
+    <div class="fr"><div class="f"><label>Subject&apos;s Full Name</label><input id="lor-name" placeholder="Full name of person being recommended"></div><div class="f"><label>Known For (years)</label><input id="lor-years" placeholder="e.g. 5 years" type="text"></div></div>
+    <div class="fr"><div class="f"><label>Capacity Known (relationship)</label><input id="lor-capacity" placeholder="e.g. colleague, patient, student, employee"></div><div class="f"><label>Purpose of Letter</label><input id="lor-purpose" placeholder="e.g. employment, migration, scholarship, general"></div></div>
+    <div class="fr"><div class="f"><label>Refer to them as</label><select id="lor-pron"><option value="he">He / his</option><option value="she">She / her</option><option value="they">They / their</option></select></div><div class="f"><label>Letterhead line</label><input id="lor-clinic" placeholder="e.g. Hospital | Private Practice"></div></div>
+    <div class="fr s"><div class="f"><label>Qualities / Attributes to Highlight</label><textarea id="lor-qualities" placeholder="e.g. integrity, diligence, professionalism, reliability, good character..."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Additional Notes (optional)</label><textarea id="lor-notes" placeholder="Any specific achievements, context, or additional remarks..."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Contact / Correspondence</label><input id="lor-contact" placeholder="e.g. your email or clinic phone number"></div></div>
+    <button class="btn bp bb" onclick="gen('lor')">Preview Letter</button>
+    <button class="btn bo bb" style="margin-top:6px" onclick="clr('lor')">&#10005; Clear</button>
+  </div></div>
+</div>
+
+<!-- ═══ PREVIEW ═══ -->
+<div id="tab-pv" class="tc">
+  <div id="dp"><div class="empty"><div class="ei">&#128196;</div><p>No document yet.<br>Generate one from the tabs above.</p></div></div>
+  <div class="sig-draw np" id="sda" style="display:none;margin-top:12px">
+    <div class="sig-lbl"><span>&#9998; Draw your signature below (it's added to the PDF)</span>
+      <span class="sig-btns"><button class="btn bo bsm tap" onclick="clrSig()">Clear</button><button class="btn bo bsm tap" onclick="saveMySignature()">Save as my signature</button></span></div>
+    <canvas id="sc" height="100"></canvas>
+  </div>
+</div>
+
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section class="screen" id="screen-settings" hidden>
+  <h1 class="screen-title">Settings</h1>
+  <p class="screen-sub">Kept on this device only. Printed on every document.</p>
+  <div class="card settings">
+    <h2>You</h2>
+    <label class="fld"><span>Name as printed</span><input type="text" id="s-name" placeholder="e.g. Dr. Jane Brown"></label>
+    <label class="fld"><span>Qualifications</span><input type="text" id="s-creds" placeholder="e.g. MBBS, DM (Surgery), FACS"></label>
+    <label class="fld"><span>Title</span><input type="text" id="s-title"></label>
+    <div class="two"><label class="fld"><span>Registration label</span><input type="text" id="s-regLabel"></label>
+      <label class="fld"><span>Registration number</span><input type="text" id="s-mcj" placeholder="e.g. 1234567"></label></div>
+    <label class="fld"><span>Location</span><input type="text" id="s-loc" placeholder="e.g. Montego Bay, St. James, Jamaica"></label>
+    <label class="fld"><span>Name for the greeting</span><input type="text" id="s-greet" placeholder="e.g. Dr. Brown"></label>
+    <h2>Logo</h2>
+    <div class="logo-row"><img id="logoPreview" alt="" hidden><span class="fine" id="noLogo">No logo yet</span>
+      <div class="logo-actions"><input type="file" id="logoIn" accept="image/png,image/jpeg" hidden>
+        <button class="btn bo tap" onclick="document.getElementById('logoIn').click()">Choose logo</button>
+        <button class="btn bo tap" id="logoRemove">Remove logo</button></div></div>
+    <h2>Signature</h2>
+    <div class="logo-row"><img id="sigPreview" alt="" hidden><span class="fine" id="noSig">No saved signature. Draw one on any preview and tap <b>Save as my signature</b>.</span>
+      <div class="logo-actions"><button class="btn bo tap" id="sigRemove">Remove signature</button></div></div>
+    <h2>Clinics and venues</h2>
+    <label class="fld"><span>One per line: shown as quick-pick buttons on each document</span><textarea id="s-clinics" rows="6" placeholder="e.g.&#10;Cornwall Regional Hospital&#10;My Private Clinic"></textarea></label>
+    <label class="fld"><span>Letterhead line for recommendation letters</span><input type="text" id="s-letter" placeholder="e.g. Hospital | Private Practice"></label>
+    <label class="fld"><span>Contact line for recommendation letters</span><input type="text" id="s-contact" placeholder="e.g. your email or clinic phone number"></label>
+    <button class="btn bp tap" onclick="saveSettingsForm()">Save</button>
+  </div>
+  <div class="card" id="folderCard"></div>
+  <div class="card danger"><h2>Clear all drafts</h2><p class="fine" style="text-align:left">Removes every unfinished document saved on this device.</p><button class="btn danger-out tap" onclick="clearAllDrafts()">Clear all drafts</button></div>
+  <div class="card update-card"><div><h2>Updates</h2><p>Quick Docs Pro updates itself when you open it. You can also check now.</p></div><button class="btn bo tap" id="updatebtn" data-update>Check for updates</button></div>
+  <div class="card devinfo-card"><h2>About this device</h2><div class="devinfo" id="devinfo"></div></div>
+  <p class="version" id="version"></p>
+</section>
+
+<div class="actionbar" id="pvBar" hidden><div class="ab-inner">
+  <button class="btn bo tap" onclick="backToForm()"><svg viewBox="0 0 24 24"><path d="M19 12H5m6-6l-6 6 6 6"/></svg> Edit</button>
+  <button class="btn bo tap" onclick="window.print()"><svg viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7"/></svg> Print</button>
+  <button class="btn bo tap" onclick="shareDoc()"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg> Share</button>
+  <button class="btn bp tap" onclick="dlPDF()"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg> Save PDF</button>
+</div></div>
+
+<dialog class="dlg" id="dlg" aria-labelledby="dlg-title"><h2 id="dlg-title"></h2><div id="dlg-body"></div><div class="dlg-actions" id="dlg-actions"></div></dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="app.js"></script>
+<script src="pro.js"></script>
+</body>
+</html>

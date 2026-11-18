@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<title>Quick Docs</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --sky:#0096C7;--sky-dark:#0077a3;--sky-light:#E8F4F8;
+  --dark:#003554;--white:#fff;--grey:#f4f6f8;
+  --border:#c8dce8;--text:#1a2a35;--muted:#6b8a9a;
+  --success:#27ae60;--danger:#e74c3c;
+  --radius:10px;--shadow:0 2px 12px rgba(0,84,138,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--grey);color:var(--text);}
+
+#hdr{background:var(--white);border-bottom:3px solid var(--sky);position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
+.hi{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;}
+.hl{font-size:.95rem;font-weight:800;color:var(--dark);}
+.hl span{color:var(--sky);}
+.hs{font-size:.62rem;color:var(--muted);}
+.hb{background:none;border:1.5px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;color:var(--muted);font-size:.7rem;}
+.hb:hover{border-color:var(--sky);color:var(--sky);}
+
+#nav{display:flex;background:var(--dark);overflow-x:auto;scrollbar-width:none;}
+#nav::-webkit-scrollbar{display:none;}
+.nb{flex:1;min-width:60px;padding:9px 3px;border:none;background:none;color:rgba(255,255,255,.5);font-size:.65rem;font-weight:700;cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;text-align:center;white-space:nowrap;}
+.nb.active{color:#fff;border-bottom-color:var(--sky);}
+
+#main{padding:14px;max-width:700px;margin:0 auto;padding-bottom:30px;}
+
+.card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden;}
+.ch{background:var(--dark);color:#fff;padding:8px 14px;font-size:.8rem;font-weight:700;}
+.ch.sky{background:var(--sky);}
+.cb{padding:14px;}
+
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px;}
+.fr.t{grid-template-columns:1fr 1fr 1fr;}
+.fr.s{grid-template-columns:1fr;}
+.f label{display:block;font-size:.65rem;font-weight:700;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px;}
+.f input,.f select,.f textarea{width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:.87rem;color:var(--text);background:var(--white);transition:border .2s;}
+.f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--sky);}
+.f textarea{min-height:75px;resize:vertical;}
+
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
+.chip{padding:3px 9px;border-radius:16px;border:1.5px solid var(--border);font-size:.68rem;font-weight:700;cursor:pointer;color:var(--muted);background:var(--white);transition:all .2s;}
+.chip.sel{background:var(--sky);color:#fff;border-color:var(--sky);}
+
+.btn{padding:9px 16px;border:none;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:5px;}
+.bp{background:var(--sky);color:#fff;}
+.bp:hover{background:var(--sky-dark);}
+.bs{background:var(--success);color:#fff;}
+.bo{background:none;border:2px solid var(--sky);color:var(--sky);}
+.bb{width:100%;justify-content:center;margin-top:9px;}
+.bsm{padding:5px 10px;font-size:.74rem;}
+.br{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+
+.rxi{background:var(--grey);border-radius:8px;padding:10px;margin-bottom:8px;}
+.rxn{font-size:.68rem;font-weight:700;color:var(--muted);margin-bottom:5px;}
+
+/* PREVIEW */
+#dp{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:22px;min-height:280px;font-family:'Segoe UI',sans-serif;}
+.dh{display:flex;align-items:center;gap:14px;border-top:2px solid var(--sky);border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:14px;background:var(--white);}
+.dl{width:62px;height:auto;}
+.dn{font-size:.95rem;font-weight:800;color:var(--dark);}
+.dc{font-size:.7rem;color:var(--muted);}
+.di{font-size:.7rem;color:var(--sky);}
+.ds{background:var(--dark);color:#fff;padding:3px 8px;font-size:.7rem;font-weight:700;margin:10px 0 5px;border-radius:3px;}
+.dr{display:flex;border:1px solid var(--border);margin-bottom:2px;font-size:.78rem;}
+.dl2{background:var(--sky-light);padding:3px 8px;font-weight:700;color:var(--dark);min-width:115px;}
+.dv{padding:3px 8px;flex:1;}
+.drx{font-size:1.7rem;font-weight:800;color:var(--dark);margin:8px 0 4px;}
+.dd{margin:5px 0 9px 13px;font-size:.84rem;}
+.ddn{font-weight:700;color:var(--dark);}
+.ddd{font-size:.76rem;color:var(--text);}
+.db{padding:7px 2px;font-size:.84rem;line-height:1.8;white-space:pre-wrap;}
+.sig-block{margin-top:26px;}
+.sig-line{border-top:1px solid var(--dark);width:190px;margin-bottom:4px;}
+.sig-name{font-size:.78rem;font-weight:700;color:var(--dark);}
+.sig-det{font-size:.72rem;color:var(--text);line-height:1.7;}
+.sig-draw{border:1.5px dashed var(--border);border-radius:8px;margin-top:10px;padding:6px;background:var(--grey);}
+.sig-lbl{font-size:.66rem;color:var(--muted);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+#sc{border-radius:6px;background:#fff;display:block;width:100%;touch-action:none;}
+.dfb{border-top:2px solid var(--sky);margin-top:14px;padding-top:5px;text-align:center;font-size:.66rem;color:var(--muted);}
+
+.empty{text-align:center;padding:28px;color:var(--muted);}
+.ei{font-size:2.2rem;margin-bottom:8px;}
+
+@media print{
+  #hdr,#nav,#main>*:not(#tab-pv){display:none!important;}
+  #tab-pv{display:block!important;}
+  .np{display:none!important;}
+  body{background:#fff;}
+  #dp{border:none;padding:0;}
+  .sig-draw{display:none;}
+}
+.tc{display:none;}
+.tc.active{display:block;}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div class="hi">
+    <div><div class="hl">Quick <span>Docs</span></div><div class="hs">Your name &middot; Registration no. &middot; Location</div></div>
+    <button class="hb" onclick="toggleFS()">&#x26F6;</button>
+  </div>
+  <div id="nav">
+    <button class="nb active" onclick="showTab('rx')">&#128138; Rx</button>
+    <button class="nb" onclick="showTab('ref')">&#128232; Referral</button>
+    <button class="nb" onclick="showTab('sl')">&#128221; Sick Leave</button>
+    <button class="nb" onclick="showTab('img')">&#128301; Imaging</button>
+    <button class="nb" onclick="showTab('lor')">&#127885; Rec Letter</button>
+    <button class="nb" onclick="showTab('pv')">&#128424; Preview</button>
+  </div>
+</div>
+
+<div id="main">
+
+<!-- ═══ PRESCRIPTION ═══ -->
+<div id="tab-rx" class="tc active">
+  <div class="card"><div class="ch">&#128100; Patient Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>First Name</label><input id="rx-fn" placeholder="First name"></div><div class="f"><label>Last Name</label><input id="rx-ln" placeholder="Last name"></div></div>
+    <div class="fr t"><div class="f"><label>Date of Birth</label><input type="date" id="rx-dob" oninput="calcAge('rx')" onchange="calcAge('rx')" onblur="calcAge('rx')"></div><div class="f"><label>Age</label><input id="rx-age" readonly style="background:#f9f9f9"></div><div class="f"><label>Sex</label><select id="rx-sex"><option value="">Select</option><option>Male</option><option>Female</option></select></div></div>
+    <div class="fr"><div class="f"><label>Date</label><input type="date" id="rx-date"></div><div class="f"><label>NHI / ID</label><input id="rx-nhi" placeholder="Optional"></div></div>
+    <div class="f" style="margin-bottom:0"><label>Clinic / Venue</label><div class="chips" id="rx-chips"></div><input id="rx-clinic" placeholder="Or type venue" style="margin-top:6px"></div>
+  </div></div>
+  <div class="card"><div class="ch sky">&#128138; Drugs</div><div class="cb">
+    <div id="rx-list">
+      <div class="rxi"><div class="rxn">Drug 1</div>
+        <div class="fr"><div class="f"><label>Drug Name</label><input class="dn" placeholder="e.g. Diclofenac (Voltaren) Gel"></div><div class="f"><label>Dose / Strength</label><input class="dd2" placeholder="e.g. 1%"></div></div>
+        <div class="fr t"><div class="f"><label>Route</label><input class="dr2" placeholder="e.g. Topical"></div><div class="f"><label>Frequency</label><input class="df" placeholder="e.g. BD"></div><div class="f"><label>Duration</label><input class="du" placeholder="e.g. 1 week"></div></div>
+        <div class="fr"><div class="f"><label>Repeat</label><input class="drp" placeholder="e.g. x1 / None"></div><div class="f"><label>Instructions</label><input class="dnt" placeholder="e.g. Apply thin layer"></div></div>
+      </div>
+    </div>
+    <button class="btn bo bsm" onclick="addDrug()">+ Add Drug</button>
+    <button class="btn bp bb" onclick="gen('rx')">&#128424; Generate Prescription</button>
+    <button class="btn bo bb" style="margin-top:6px" onclick="clr('rx')">&#10005; Clear</button>
+  </div></div>
+</div>
+
+<!-- ═══ REFERRAL ═══ -->
+<div id="tab-ref" class="tc">
+  <div class="card"><div class="ch">&#128100; Patient Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>First Name</label><input id="ref-fn" placeholder="First name"></div><div class="f"><label>Last Name</label><input id="ref-ln" placeholder="Last name"></div></div>
+    <div class="fr t"><div class="f"><label>Date of Birth</label><input type="date" id="ref-dob" oninput="calcAge('ref')" onchange="calcAge('ref')" onblur="calcAge('ref')"></div><div class="f"><label>Age</label><input id="ref-age" readonly style="background:#f9f9f9"></div><div class="f"><label>Sex</label><select id="ref-sex"><option value="">Select</option><option>Male</option><option>Female</option></select></div></div>
+    <div class="fr"><div class="f"><label>Date</label><input type="date" id="ref-date"></div><div class="f"><label>NHI / ID</label><input id="ref-nhi" placeholder="Optional"></div></div>
+    <div class="f" style="margin-bottom:0"><label>Referring From</label><div class="chips" id="ref-chips"></div><input id="ref-clinic" placeholder="Or type venue" style="margin-top:6px"></div>
+  </div></div>
+  <div class="card"><div class="ch sky">&#128232; Referral Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>Specialty</label><input id="ref-spec" placeholder="e.g. Cardiology, Vascular Surgery"></div><div class="f"><label>Doctor / Unit</label><input id="ref-doc" placeholder="e.g. Dr. Smith"></div></div>
+    <div class="fr"><div class="f"><label>Facility</label><input id="ref-fac" placeholder="e.g. Cornwall Regional Hospital, KPH"></div><div class="f"><label>Urgency</label><select id="ref-urg"><option value="Routine">Routine</option><option value="Urgent">Urgent</option><option value="Emergency">Emergency</option></select></div></div>
+    <div class="fr s"><div class="f"><label>Diagnosis / Chief Complaint</label><input id="ref-dx" placeholder="e.g. Right inguinal hernia"></div></div>
+    <div class="fr s"><div class="f"><label>History &amp; Examination Findings</label><textarea id="ref-hx" placeholder="Brief relevant history and examination findings..."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Investigations Done</label><textarea id="ref-inv" placeholder="e.g. USS abdomen — right inguinal hernia confirmed. FBC normal."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Management So Far</label><textarea id="ref-mgmt" placeholder="e.g. Analgesia, conservative management..."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Specific Request / Clinical Question</label><textarea id="ref-req" placeholder="e.g. Please assess and advise re: surgical management."></textarea></div></div>
+    <button class="btn bp bb" onclick="gen('ref')">&#128424; Generate Referral</button>
+    <button class="btn bo bb" style="margin-top:6px" onclick="clr('ref')">&#10005; Clear</button>
+  </div></div>
+</div>
+
+<!-- ═══ SICK LEAVE ═══ -->
+<div id="tab-sl" class="tc">
+  <div class="card"><div class="ch">&#128100; Patient Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>First Name</label><input id="sl-fn" placeholder="First name"></div><div class="f"><label>Last Name</label><input id="sl-ln" placeholder="Last name"></div></div>
+    <div class="fr t"><div class="f"><label>Date of Birth</label><input type="date" id="sl-dob" oninput="calcAge('sl')" onchange="calcAge('sl')" onblur="calcAge('sl')"></div><div class="f"><label>Age</label><input id="sl-age" readonly style="background:#f9f9f9"></div><div class="f"><label>Sex</label><select id="sl-sex"><option value="">Select</option><option>Male</option><option>Female</option></select></div></div>
+    <div class="fr"><div class="f"><label>Date Seen</label><input type="date" id="sl-date"></div><div class="f"><label>NHI / ID</label><input id="sl-nhi" placeholder="Optional"></div></div>
+    <div class="f" style="margin-bottom:0"><label>Clinic / Venue</label><div class="chips" id="sl-chips"></div><input id="sl-clinic" placeholder="Or type venue" style="margin-top:6px"></div>
+  </div></div>
+  <div class="card"><div class="ch sky">&#128221; Sick Leave Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>From Date</label><input type="date" id="sl-from"></div><div class="f"><label>To Date</label><input type="date" id="sl-to"></div></div>
+    <div class="fr s"><div class="f"><label>Reason (general terms)</label><input id="sl-reason" placeholder="e.g. Medical condition requiring rest"></div></div>
+    <div class="fr s"><div class="f"><label>Employer / Organisation (optional)</label><input id="sl-emp" placeholder="e.g. Ministry of Health"></div></div>
+    <button class="btn bp bb" onclick="gen('sl')">&#128424; Generate Sick Leave</button>
+    <button class="btn bo bb" style="margin-top:6px" onclick="clr('sl')">&#10005; Clear</button>
+  </div></div>
+</div>
+
+<!-- ═══ IMAGING REQUEST ═══ -->
+<div id="tab-img" class="tc">
+  <div class="card"><div class="ch">&#128100; Patient Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>First Name</label><input id="img-fn" placeholder="First name"></div><div class="f"><label>Last Name</label><input id="img-ln" placeholder="Last name"></div></div>
+    <div class="fr t"><div class="f"><label>Date of Birth</label><input type="date" id="img-dob" oninput="calcAge('img')" onchange="calcAge('img')" onblur="calcAge('img')"></div><div class="f"><label>Age</label><input id="img-age" readonly style="background:#f9f9f9"></div><div class="f"><label>Sex</label><select id="img-sex"><option value="">Select</option><option>Male</option><option>Female</option></select></div></div>
+    <div class="fr"><div class="f"><label>Date</label><input type="date" id="img-date"></div><div class="f"><label>NHI / ID</label><input id="img-nhi" placeholder="Optional"></div></div>
+    <div class="f" style="margin-bottom:0"><label>Requesting From</label><div class="chips" id="img-chips"></div><input id="img-clinic" placeholder="Or type venue" style="margin-top:6px"></div>
+  </div></div>
+  <div class="card"><div class="ch sky">&#128301; Imaging Details</div><div class="cb">
+    <div class="fr"><div class="f"><label>Modality</label><select id="img-mod"><option value="">Select modality</option><option>CT Scan</option><option>Ultrasound</option><option>MRI</option><option>X-Ray</option><option>Mammogram</option><option>Sonomammogram</option><option>PET Scan</option><option>Nuclear Medicine</option><option>Fluoroscopy</option><option>Angiogram</option></select></div><div class="f"><label>Region / Area</label><input id="img-region" placeholder="e.g. Abdomen and Pelvis"></div></div>
+    <div class="fr"><div class="f"><label>Contrast</label><select id="img-contrast"><option value="">Not applicable</option><option>With IV contrast</option><option>Without contrast</option><option>With and without IV contrast</option><option>With oral contrast</option><option>With oral and IV contrast</option></select></div><div class="f"><label>Priority</label><select id="img-pri"><option>Routine</option><option>Urgent</option><option>Emergency</option></select></div></div>
+    <div class="fr s"><div class="f"><label>Clinical Indication / History</label><textarea id="img-ind" placeholder="Brief clinical history and relevant findings..."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Clinical Question</label><textarea id="img-q" placeholder="What are you querying? e.g. ? Malignancy. ? Lumbar-sacral injury. ? Choledocholithiasis."></textarea></div></div>
+    <button class="btn bp bb" onclick="gen('img')">&#128424; Generate Imaging Request</button>
+    <button class="btn bo bb" style="margin-top:6px" onclick="clr('img')">&#10005; Clear</button>
+  </div></div>
+</div>
+
+<!-- ═══ LETTER OF RECOMMENDATION ═══ -->
+<div id="tab-lor" class="tc">
+  <div class="card"><div class="ch sky">&#127885; Letter of Recommendation</div><div class="cb">
+    <div class="fr"><div class="f"><label>Recipient Name (optional)</label><input id="lor-to" placeholder="e.g. To Whom It May Concern / Dear Sir/Madam"></div><div class="f"><label>Date</label><input type="date" id="lor-date"></div></div>
+    <div class="fr"><div class="f"><label>Subject&apos;s Full Name</label><input id="lor-name" placeholder="Full name of person being recommended"></div><div class="f"><label>Known For (years)</label><input id="lor-years" placeholder="e.g. 5 years" type="text"></div></div>
+    <div class="fr"><div class="f"><label>Capacity Known (relationship)</label><input id="lor-capacity" placeholder="e.g. colleague, patient, student, employee"></div><div class="f"><label>Purpose of Letter</label><input id="lor-purpose" placeholder="e.g. employment, migration, scholarship, general"></div></div>
+    <div class="fr s"><div class="f"><label>Qualities / Attributes to Highlight</label><textarea id="lor-qualities" placeholder="e.g. integrity, diligence, professionalism, reliability, good character..."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Additional Notes (optional)</label><textarea id="lor-notes" placeholder="Any specific achievements, context, or additional remarks..."></textarea></div></div>
+    <div class="fr s"><div class="f"><label>Contact / Correspondence</label><input id="lor-contact" placeholder="e.g. your email or clinic phone number"></div></div>
+    <button class="btn bp bb" onclick="gen('lor')">&#128424; Generate Letter</button>
+    <button class="btn bo bb" style="margin-top:6px" onclick="clr('lor')">&#10005; Clear</button>
+  </div></div>
+</div>
+
+<!-- ═══ PREVIEW ═══ -->
+<div id="tab-pv" class="tc">
+  <div class="br np" style="margin-bottom:12px">
+    <button class="btn bp" onclick="window.print()">&#128424; Print</button>
+    <button class="btn bs" onclick="dlPDF()">&#11015; PDF</button>
+    <button class="btn bo bsm" onclick="clrSig()">&#9999; Clear Sig</button>
+    <button class="btn bo bsm" onclick="showTab('rx')">&#8592; Back</button>
+  </div>
+  <div id="dp"><div class="empty"><div class="ei">&#128196;</div><p>No document yet.<br>Generate one from the tabs above.</p></div></div>
+  <div class="sig-draw np" id="sda" style="display:none;margin-top:12px">
+    <div class="sig-lbl"><span>&#9998; Draw your signature below</span><button class="btn bo bsm" onclick="clrSig()">Clear</button></div>
+    <canvas id="sc" height="100"></canvas>
+  </div>
+</div>
+
+</div><!-- end main -->
+
+<script>
+const DR={
+  // identity removed for the public repository
+  name:"Your Name",
+  creds:"Qualifications",
+  title:"Consultant General Surgeon",
+  mcj:"",
+  loc:"Location",
+  logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="
+};
+let docType='';
+
+window.onload=()=>{
+  const t=new Date().toISOString().split("T")[0];
+  ["rx-date","ref-date","sl-date","sl-from","img-date","lor-date"].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value=t;
+  });
+  initSig();
+};
+
+function tod(){return new Date().toISOString().split("T")[0];}
+function fmt(s){if(!s)return"";return new Date(s).toLocaleDateString("en-GB",{day:"2-digit",month:"long",year:"numeric"});}
+function toggleFS(){if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();}
+function showTab(n){
+  document.querySelectorAll(".tc").forEach(t=>t.classList.remove("active"));
+  document.querySelectorAll(".nb").forEach(b=>b.classList.remove("active"));
+  document.getElementById("tab-"+n).classList.add("active");
+  ["rx","ref","sl","img","lor","pv"].forEach((t,i)=>{if(t===n)document.querySelectorAll(".nb")[i].classList.add("active");});
+}
+function calcAge(p){
+  const dob=document.getElementById(p+"-dob").value;
+  if(!dob||dob.length<10)return;
+  const today=new Date();
+  const parts=dob.split("-");
+  const birth=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
+  if(isNaN(birth.getTime()))return;
+  let age=today.getFullYear()-birth.getFullYear();
+  const m=today.getMonth()-birth.getMonth();
+  if(m<0||(m===0&&today.getDate()<birth.getDate()))age--;
+  if(age>=0&&age<130)document.getElementById(p+"-age").value=age+" yrs";
+}
+
+// Android date picker fix — catches all date input changes via event delegation
+document.addEventListener("DOMContentLoaded",()=>{
+  document.body.addEventListener("change",function(e){
+    if(e.target&&e.target.type==="date"&&e.target.id&&e.target.id.endsWith("-dob")){
+      const prefix=e.target.id.replace("-dob","");
+      calcAge(prefix);
+    }
+  });
+  document.body.addEventListener("input",function(e){
+    if(e.target&&e.target.type==="date"&&e.target.id&&e.target.id.endsWith("-dob")){
+      const prefix=e.target.id.replace("-dob","");
+      calcAge(prefix);
+    }
+  });
+});
+function selClinic(el,p,name){
+  document.querySelectorAll("#"+p+"-chips .chip").forEach(c=>c.classList.remove("sel"));
+  el.classList.add("sel");
+  document.getElementById(p+"-clinic").value=name;
+}
+function addDrug(){
+  const list=document.getElementById("rx-list");
+  const num=list.querySelectorAll(".rxi").length+1;
+  const d=document.createElement("div");d.className="rxi";
+  d.innerHTML=`<div class="rxn">Drug ${num}</div><div class="fr"><div class="f"><label>Drug Name</label><input class="dn" placeholder="Drug name"></div><div class="f"><label>Dose</label><input class="dd2" placeholder="Dose"></div></div><div class="fr t"><div class="f"><label>Route</label><input class="dr2" placeholder="Route"></div><div class="f"><label>Frequency</label><input class="df" placeholder="e.g. BD"></div><div class="f"><label>Duration</label><input class="du" placeholder="e.g. 5 days"></div></div><div class="fr"><div class="f"><label>Repeat</label><input class="drp" placeholder="x1/None"></div><div class="f"><label>Notes</label><input class="dnt" placeholder="Instructions"></div></div>`;
+  list.appendChild(d);
+}
+function clr(p){
+  document.querySelectorAll(`#tab-${p} input,#tab-${p} select,#tab-${p} textarea`).forEach(el=>{
+    if(el.readOnly)return;
+    if(el.type==="date"){
+      if(el.id&&(el.id.endsWith("-date")||el.id==="sl-from"))el.value=tod();
+      else el.value="";
+    }else el.value="";
+  });
+  document.querySelectorAll(`#${p}-chips .chip`).forEach(c=>c.classList.remove("sel"));
+  if(p==="rx"){
+    const list=document.getElementById("rx-list");
+    while(list.children.length>1)list.removeChild(list.lastChild);
+    list.querySelectorAll(".dn,.dd2,.dr2,.df,.du,.drp,.dnt").forEach(i=>i.value="");
+  }
+}
+
+// ── BUILDERS ──────────────────────────────────
+function bHdr(clinic){
+  return`<div class="dh"><img src="${DR.logo}" class="dl" alt="Logo"><div><div class="dn">${DR.name}</div><div class="dc">${DR.creds} &middot; ${DR.title}</div><div class="di">${clinic} &middot; ${DR.loc}</div></div></div>`;
+}
+function bPt(name,dob,age,sex,date){
+  return`<div class="ds">PATIENT DETAILS</div>
+    <div class="dr"><div class="dl2">Patient Name</div><div class="dv">${name||"—"}</div></div>
+    ${dob?`<div class="dr"><div class="dl2">Date of Birth</div><div class="dv">${fmt(dob)}${sex?" &middot; "+sex:""}</div></div>`:""}
+    ${age?`<div class="dr"><div class="dl2">Age</div><div class="dv">${age}</div></div>`:""}
+    <div class="dr"><div class="dl2">Date</div><div class="dv">${fmt(date||tod())}</div></div>`;
+}
+function bSig(date){
+  return`<div class="sig-block"><div class="sig-line"></div><div class="sig-name">${DR.name}</div><div class="sig-det">${DR.creds}<br>${DR.title}<br>MCJ Reg. No: ${DR.mcj}<br>Date: ${fmt(date||tod())}</div></div>`;
+}
+function bFtr(clinic,note){
+  return`<div class="dfb">MCJ Reg. No: ${DR.mcj} &middot; ${clinic} &middot; ${DR.loc}${note?" &middot; "+note:""}</div>`;
+}
+function show(html,type){
+  docType=type;
+  document.getElementById("dp").innerHTML=html;
+  document.getElementById("sda").style.display="block";
+  showTab("pv");
+}
+
+// ── GENERATORS ────────────────────────────────
+function gen(type){
+  if(type==="rx") genRx();
+  else if(type==="ref") genRef();
+  else if(type==="sl") genSL();
+  else if(type==="img") genImg();
+  else if(type==="lor") genLOR();
+}
+
+function genRx(){
+  const fn=document.getElementById("rx-fn").value.trim();
+  const ln=document.getElementById("rx-ln").value.trim();
+  const name=`${fn} ${ln}`.trim()||"—";
+  const dob=document.getElementById("rx-dob").value;
+  const age=document.getElementById("rx-age").value;
+  const sex=document.getElementById("rx-sex").value;
+  const date=document.getElementById("rx-date").value;
+  const clinic=document.getElementById("rx-clinic").value||"Private Practice";
+  let drugs="";let num=1;
+  document.querySelectorAll("#rx-list .rxi").forEach(row=>{
+    const n=row.querySelector(".dn")?.value||"";
+    const dose=row.querySelector(".dd2")?.value||"";
+    const route=row.querySelector(".dr2")?.value||"";
+    const freq=row.querySelector(".df")?.value||"";
+    const dur=row.querySelector(".du")?.value||"";
+    const rep=row.querySelector(".drp")?.value||"";
+    const note=row.querySelector(".dnt")?.value||"";
+    if(!n)return;
+    const allParts=[n+(dose?" "+dose:""),[route,freq,dur].filter(Boolean).join(" · "),(rep?"Repeat: "+rep:""),(note?note:"")].filter(Boolean);
+    drugs+=`<div class="dd"><div class="ddn">${num}. ${allParts.join(" &middot; ")}</div></div>`;
+    num++;
+  });
+  if(!drugs){alert("Please enter at least one drug.");return;}
+  show(bHdr(clinic)+bPt(name,dob,age,sex,date)+`<div class="drx">Rx</div><div class="ds">PRESCRIPTION</div>`+drugs+bSig(date)+bFtr(clinic,"Valid 30 days from date of issue"),"rx");
+}
+
+function genRef(){
+  const fn=document.getElementById("ref-fn").value.trim();
+  const ln=document.getElementById("ref-ln").value.trim();
+  if(!fn&&!ln){alert("Please enter patient name.");return;}
+  const name=`${fn} ${ln}`.trim();
+  const dob=document.getElementById("ref-dob").value;
+  const age=document.getElementById("ref-age").value;
+  const sex=document.getElementById("ref-sex").value;
+  const date=document.getElementById("ref-date").value;
+  const clinic=document.getElementById("ref-clinic").value||"Private Practice";
+  const spec=document.getElementById("ref-spec").value;
+  const doc2=document.getElementById("ref-doc").value;
+  const fac=document.getElementById("ref-fac").value;
+  const urg=document.getElementById("ref-urg").value;
+  const dx=document.getElementById("ref-dx").value;
+  const hx=document.getElementById("ref-hx").value;
+  const inv=document.getElementById("ref-inv").value;
+  const mgmt=document.getElementById("ref-mgmt").value;
+  const req=document.getElementById("ref-req").value;
+  const toLine=[spec,doc2,fac].filter(Boolean).join(" — ");
+  const urgBadge=urg==="Urgent"?"&#9888;&#65039; URGENT — ":urg==="Emergency"?"&#128680; EMERGENCY — ":"";
+  const body=`
+    <div class="ds">REFERRAL DETAILS</div>
+    <div class="dr"><div class="dl2">Referring To</div><div class="dv">${toLine||"—"}</div></div>
+    <div class="dr"><div class="dl2">Diagnosis</div><div class="dv">${dx||"—"}</div></div>
+    <div class="dr"><div class="dl2">Urgency</div><div class="dv">${urgBadge}${urg}</div></div>
+    ${hx?`<div class="ds">HISTORY &amp; EXAMINATION</div><div class="db">${hx}</div>`:""}
+    ${inv?`<div class="ds">INVESTIGATIONS TO DATE</div><div class="db">${inv}</div>`:""}
+    ${mgmt?`<div class="ds">MANAGEMENT SO FAR</div><div class="db">${mgmt}</div>`:""}
+    <div class="ds">REQUEST</div>
+    <div class="db">${req||"Please assess and advise re: further management of this patient."}</div>
+    <p style="margin-top:14px;font-size:.84rem">Thank you for your kind assistance with this patient.</p>`;
+  show(bHdr(clinic)+bPt(name,dob,age,sex,date)+body+bSig(date)+bFtr(clinic),"ref");
+}
+
+function genSL(){
+  const fn=document.getElementById("sl-fn").value.trim();
+  const ln=document.getElementById("sl-ln").value.trim();
+  if(!fn&&!ln){alert("Please enter patient name.");return;}
+  const name=`${fn} ${ln}`.trim();
+  const dob=document.getElementById("sl-dob").value;
+  const age=document.getElementById("sl-age").value;
+  const sex=document.getElementById("sl-sex").value;
+  const date=document.getElementById("sl-date").value;
+  const clinic=document.getElementById("sl-clinic").value||"Private Practice";
+  const from=document.getElementById("sl-from").value;
+  const to=document.getElementById("sl-to").value;
+  const reason=document.getElementById("sl-reason").value;
+  const emp=document.getElementById("sl-emp").value;
+  if(!from||!to){alert("Please enter sick leave dates.");return;}
+  const body=`<div class="ds">SICK LEAVE CERTIFICATE</div>
+    <div class="db">${emp?"To: "+emp+"\n\n":""}This is to certify that <strong>${name}</strong> was examined by the undersigned on <strong>${fmt(date)}</strong> and is medically unfit for work${reason?" due to "+reason:" due to a medical condition"}.
+
+Sick leave is granted from <strong>${fmt(from)}</strong> to <strong>${fmt(to)}</strong> inclusive.
+
+This certificate is issued in good faith based on clinical examination.</div>`;
+  show(bHdr(clinic)+bPt(name,dob,age,sex,date)+body+bSig(date)+bFtr(clinic),"sl");
+}
+
+function genImg(){
+  const fn=document.getElementById("img-fn").value.trim();
+  const ln=document.getElementById("img-ln").value.trim();
+  if(!fn&&!ln){alert("Please enter patient name.");return;}
+  const name=`${fn} ${ln}`.trim();
+  const dob=document.getElementById("img-dob").value;
+  const age=document.getElementById("img-age").value;
+  const sex=document.getElementById("img-sex").value;
+  const date=document.getElementById("img-date").value;
+  const clinic=document.getElementById("img-clinic").value||"Private Practice";
+  const mod=document.getElementById("img-mod").value;
+  const region=document.getElementById("img-region").value;
+  const contrast=document.getElementById("img-contrast").value;
+  const pri=document.getElementById("img-pri").value;
+  const ind=document.getElementById("img-ind").value;
+  const q=document.getElementById("img-q").value;
+  if(!mod){alert("Please select an imaging modality.");return;}
+  const body=`
+    <div class="ds">EXAMINATION REQUESTED</div>
+    <div class="dr"><div class="dl2">Modality</div><div class="dv">${mod}</div></div>
+    <div class="dr"><div class="dl2">Region / Area</div><div class="dv">${region||"—"}</div></div>
+    ${contrast?`<div class="dr"><div class="dl2">Contrast</div><div class="dv">${contrast}</div></div>`:""}
+    <div class="dr"><div class="dl2">Priority</div><div class="dv">${pri}</div></div>
+    ${ind?`<div class="ds">CLINICAL INDICATION</div><div class="db">${ind}</div>`:""}
+    ${q?`<div class="ds">CLINICAL QUESTION</div><div class="db">${q}</div>`:""}
+    ${contrast&&contrast.includes("IV")?`<p style="margin-top:10px;font-size:.78rem;color:var(--muted)">&#9888;&#65039; Please screen for contrast allergy and check eGFR prior to IV contrast administration.</p>`:""}`;
+  show(bHdr(clinic)+bPt(name,dob,age,sex,date)+body+bSig(date)+bFtr(clinic),"img");
+}
+
+function genLOR(){
+  const name=document.getElementById("lor-name").value.trim();
+  if(!name){alert("Please enter the subject's name.");return;}
+  const to=document.getElementById("lor-to").value.trim()||"To Whom It May Concern";
+  const date=document.getElementById("lor-date").value;
+  const years=document.getElementById("lor-years").value.trim();
+  const capacity=document.getElementById("lor-capacity").value.trim()||"colleague";
+  const purpose=document.getElementById("lor-purpose").value.trim()||"general purposes";
+  const qualities=document.getElementById("lor-qualities").value.trim();
+  const notes=document.getElementById("lor-notes").value.trim();
+  const contact=document.getElementById("lor-contact").value.trim();
+
+  const qualList=qualities?qualities.split(/[,;\n]+/).map(q=>q.trim()).filter(Boolean):["integrity","professionalism","good character"];
+  const qualStr=qualList.length>1?qualList.slice(0,-1).join(", ")+" and "+qualList[qualList.length-1]:qualList[0]||"integrity and good character";
+
+  const body=`
+    <div class="ds">LETTER OF RECOMMENDATION</div>
+    <div class="db">${fmt(date)}
+
+${to},
+
+RE: ${name.toUpperCase()}
+
+I am pleased to write this letter of recommendation on behalf of ${name}. I have had the pleasure of knowing ${name} in my capacity as a Consultant General Surgeon${years?" for "+years:""}${capacity&&capacity!=="colleague"?", in the capacity of "+capacity:""}.
+
+During this time, I have consistently observed ${name} to be a person of exceptional ${qualStr}. ${name} has demonstrated a commendable level of dedication and conduct that reflects positively on both his personal and professional character.${notes?"\n\n"+notes:""}
+
+It is therefore with great confidence and without reservation that I recommend ${name} for ${purpose}. I am fully persuaded that ${name} will prove to be a worthy and valuable individual in any endeavour he undertakes.
+
+Any courtesies extended to ${name} will be greatly appreciated.
+
+Yours faithfully,${contact?"\n\nFor further information, please feel free to contact me at: "+contact:""}</div>`;
+
+  show(bHdr("Hospital | Private Practice")+body+bSig(date)+bFtr(DR.loc),"lor");
+}
+
+// ── SIGNATURE ─────────────────────────────────
+function initSig(){
+  const canvas=document.getElementById("sc");
+  const ctx=canvas.getContext("2d");
+  let drawing=false;
+  function pos(e){
+    const r=canvas.getBoundingClientRect();
+    const s=e.touches?e.touches[0]:e;
+    return{x:(s.clientX-r.left)*(canvas.width/r.width),y:(s.clientY-r.top)*(canvas.height/r.height)};
+  }
+  function start(e){e.preventDefault();drawing=true;const p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);}
+  function draw(e){e.preventDefault();if(!drawing)return;const p=pos(e);ctx.lineTo(p.x,p.y);ctx.strokeStyle="#003554";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();}
+  function stop(){drawing=false;}
+  canvas.addEventListener("mousedown",start);canvas.addEventListener("mousemove",draw);canvas.addEventListener("mouseup",stop);
+  canvas.addEventListener("touchstart",start,{passive:false});canvas.addEventListener("touchmove",draw,{passive:false});canvas.addEventListener("touchend",stop);
+  setTimeout(()=>{canvas.width=canvas.offsetWidth||400;},100);
+}
+function clrSig(){
+  const c=document.getElementById("sc");
+  c.getContext("2d").clearRect(0,0,c.width,c.height);
+}
+
+// ── PDF (Template — SKY/DARK/LIGHT_BLUE) ────────────────────────────
+async function dlPDF(){
+  const preview=document.getElementById("dp");
+  if(!preview.querySelector(".dh")){alert("Generate a document first.");return;}
+  if(typeof window.jspdf==="undefined"){alert("PDF library not loaded. Requires internet on first use.");return;}
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+  const W=210, M=18, CW=W-M*2;
+  const SKY=[0,150,199], DARK=[0,53,84], LB=[232,244,248], WHITE=[255,255,255], CHARCOAL=[26,42,53], MUTED=[107,138,154];
+
+  // ── HEADER: white background, logo + dark text, slim SKY accent lines ────
+  // Top accent line
+  doc.setFillColor(...SKY); doc.rect(0,0,W,1.5,"F");
+  // White header background
+  doc.setFillColor(...WHITE); doc.rect(0,1.5,W,40,"F");
+  // Logo
+  doc.addImage(DR.logo,"PNG",M,3,38,32);
+  // Doctor name in DARK
+  doc.setFont("helvetica","bold"); doc.setFontSize(14); doc.setTextColor(...DARK);
+  doc.text(DR.name, M+44, 14);
+  // Credentials
+  doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(...MUTED);
+  doc.text(DR.creds+" · "+DR.title, M+44, 20);
+  // Clinic line
+  const instEl=preview.querySelector(".di");
+  const clinicLine=instEl?instEl.textContent.trim():"";
+  doc.setFontSize(8); doc.setTextColor(...SKY);
+  doc.text(clinicLine, M+44, 27);
+  // MCJ
+  doc.setFontSize(7); doc.setTextColor(...MUTED);
+  doc.text("MCJ Reg. No: "+DR.mcj, M+44, 33);
+  // Bottom accent line
+  doc.setFillColor(...SKY); doc.rect(0,41.5,W,1.5,"F");
+
+  let y=50; // start below header
+
+  // ── DOCUMENT TITLE (type label) ────────────────────────────────────────────
+  const typeLabels={rx:"PRESCRIPTION",ref:"REFERRAL LETTER",sl:"SICK LEAVE CERTIFICATE",img:"IMAGING REQUEST",lor:"LETTER OF RECOMMENDATION"};
+  const titleText=typeLabels[docType]||"DOCUMENT";
+  doc.setFillColor(...DARK); doc.rect(M,y,CW,8,"F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(...WHITE);
+  doc.text(titleText, W/2, y+5.5, {align:"center"});
+  y+=12;
+
+  // ── CONTENT SECTIONS ───────────────────────────────────────────────────────
+  preview.querySelectorAll(".ds,.dr,.drx,.dd,.db,.sig-block,.dfb").forEach(el=>{
+    if(y>272){doc.addPage();y=20;}
+
+    if(el.classList.contains("ds")){
+      // Section bar — SKY background
+      doc.setFillColor(...SKY); doc.rect(M,y,CW,6.5,"F");
+      doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(...WHITE);
+      doc.text(el.textContent.trim(), M+3, y+4.5);
+      y+=9;
+
+    }else if(el.classList.contains("dr")){
+      // Field row — LIGHT_BLUE label, white value
+      const lbl=el.querySelector(".dl2"), val=el.querySelector(".dv");
+      if(lbl&&val){
+        const ROW_H=7, LBL_W=52;
+        doc.setFillColor(...LB); doc.rect(M,y,LBL_W,ROW_H,"F");
+        doc.setFillColor(...WHITE); doc.rect(M+LBL_W,y,CW-LBL_W,ROW_H,"F");
+        doc.setDrawColor(200,220,232); doc.setLineWidth(0.3);
+        doc.rect(M,y,CW,ROW_H,"S");
+        doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(...DARK);
+        doc.text(lbl.textContent.trim(), M+2, y+4.8);
+        doc.setFont("helvetica","normal"); doc.setTextColor(...CHARCOAL);
+        // Wrap long values
+        const valLines=doc.splitTextToSize(val.textContent.trim(), CW-LBL_W-4);
+        if(valLines.length>1){
+          valLines.forEach((line,i)=>{
+            if(i>0){
+              doc.setFillColor(...WHITE); doc.rect(M,y+ROW_H*i,CW,ROW_H,"F");
+              doc.setDrawColor(200,220,232); doc.rect(M,y+ROW_H*i,CW,ROW_H,"S");
+            }
+            doc.text(line, M+LBL_W+2, y+4.8+ROW_H*i);
+          });
+          y+=ROW_H*valLines.length+1;
+        }else{
+          doc.text(valLines[0]||"", M+LBL_W+2, y+4.8);
+          y+=ROW_H+1;
+        }
+      }
+
+    }else if(el.classList.contains("drx")){
+      // Rx symbol
+      y+=2;
+      doc.setFont("helvetica","bold"); doc.setFontSize(22); doc.setTextColor(...DARK);
+      doc.text("Rx", M, y+10); y+=14;
+
+    }else if(el.classList.contains("dd")){
+      // Drug line — single line, indented
+      const dn=el.querySelector(".ddn");
+      if(dn){
+        const lines=doc.splitTextToSize(dn.textContent.trim(), CW-8);
+        doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.setTextColor(...DARK);
+        lines.forEach(line=>{
+          if(y>272){doc.addPage();y=20;}
+          doc.text(line, M+6, y); y+=5.5;
+        });
+      }
+      y+=2;
+
+    }else if(el.classList.contains("db")){
+      // Body text — normal, wrapped
+      doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(...CHARCOAL);
+      const rawText=el.innerText||el.textContent;
+      const paras=rawText.split(/\n+/);
+      paras.forEach(para=>{
+        if(!para.trim()) return;
+        const lines=doc.splitTextToSize(para.trim(), CW);
+        lines.forEach(line=>{
+          if(y>272){doc.addPage();y=20;}
+          doc.text(line, M, y); y+=5.5;
+        });
+        y+=2;
+      });
+      y+=2;
+
+    }else if(el.classList.contains("sig-block")){
+      y+=10;
+      // Embed drawn signature if present
+      const canvas=document.getElementById("sc");
+      const blank=document.createElement("canvas"); blank.width=canvas.width; blank.height=canvas.height;
+      if(canvas.toDataURL()!==blank.toDataURL()){
+        doc.addImage(canvas.toDataURL("image/png"),"PNG",M,y-2,55,18);
+        y+=20;
+      }
+      // Sig line
+      doc.setDrawColor(...DARK); doc.setLineWidth(0.5); doc.line(M,y,M+60,y); y+=4;
+      doc.setFont("helvetica","bold"); doc.setFontSize(9); doc.setTextColor(...DARK);
+      doc.text(DR.name, M, y); y+=5;
+      doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(...CHARCOAL);
+      doc.text(DR.creds, M, y); y+=4.5;
+      doc.text(DR.title, M, y); y+=4.5;
+      doc.text("MCJ Reg. No: "+DR.mcj, M, y); y+=4.5;
+      // Date from sig block
+      const sigDet=el.querySelector(".sig-det");
+      if(sigDet){
+        const lines=sigDet.textContent.split("\n").map(l=>l.trim()).filter(Boolean);
+        const dateLine=lines.find(l=>l.startsWith("Date:"));
+        if(dateLine){doc.text(dateLine, M, y); y+=4.5;}
+      }
+      y+=4;
+
+    }else if(el.classList.contains("dfb")){
+      // Footer bar — SKY line + centred text
+      if(y<270) y=Math.max(y,270);
+      doc.setFillColor(...SKY); doc.rect(0,y,W,2,"F"); y+=4;
+      doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(...MUTED);
+      doc.text(el.textContent.trim(), W/2, y, {align:"center"});
+    }
+  });
+
+  // ── SAVE ──────────────────────────────────────────────────────────────────
+  const typeLabel={rx:"Prescription",ref:"Referral",sl:"Sick_Leave",img:"Imaging_Request",lor:"Recommendation_Letter"}[docType]||"Document";
+  const pname=(preview.querySelector(".dv")?.textContent||"document").replace(/\s+/g,"_").substring(0,20);
+  doc.save(`${typeLabel}_${pname}_${new Date().toISOString().split("T")[0]}.pdf`);
+}
+</script>
+</body>
+</html>
