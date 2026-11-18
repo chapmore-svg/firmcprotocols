@@ -2,7 +2,7 @@
    The rota rules (duty cycle, day-offs, audit, overtime import, Excel) live in app.js, unchanged
    from the Firm C Rota app v5.2.1 apart from the settings hooks noted there. */
 
-const APP_VERSION = "1.1.1";
+const APP_VERSION = "1.1.2";
 const $id = id => document.getElementById(id);
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 

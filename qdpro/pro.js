@@ -2,7 +2,7 @@
    folder), sharing, install and updates. The documents themselves (wording, layout, the PDF) are the
    original Quick Docs code in app.js. */
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.0.1";
 const $id = id => document.getElementById(id);
 const UA = navigator.userAgent;
 const IS_ANDROID = /Android/i.test(UA);

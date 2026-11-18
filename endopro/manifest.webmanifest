@@ -2,7 +2,7 @@
   "name": "Endo Report Pro",
   "short_name": "Endo Report",
   "description": "Structured colonoscopy and upper GI endoscopy reports, as a branded PDF.",
-  "id": "./",
+  "id": "/firmcprotocols/endopro/",
   "start_url": "./#home",
   "scope": "./",
   "display": "standalone",

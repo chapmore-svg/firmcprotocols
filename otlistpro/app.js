@@ -3,7 +3,7 @@
    Patient details live only in memory on this device; settings live in localStorage. */
 "use strict";
 
-const APP_VERSION = "1.7.1";
+const APP_VERSION = "1.7.2";
 const $ = id => document.getElementById(id);
 const TICK = "√";
 

@@ -1,5 +1,5 @@
 /* Quick Docs Pro offline worker. Bump CACHE whenever any app file changes. */
-const CACHE = "qdpro-1.0.0";
+const CACHE = "qdpro-1.0.1";
 const FILES = [
   "./", "./index.html", "./styles.css", "./app.js", "./pro.js", "./manifest.webmanifest",
   "./vendor/jspdf.umd.min.js",

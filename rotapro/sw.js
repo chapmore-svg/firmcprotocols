@@ -1,5 +1,5 @@
 /* Rota Pro offline worker. Bump CACHE whenever any app file changes. */
-const CACHE = "rotapro-1.1.1";
+const CACHE = "rotapro-1.1.2";
 const FILES = [
   "./", "./index.html", "./styles.css", "./app.js", "./pro.js", "./manifest.webmanifest",
   "./vendor/xlsx.bundle.js", "./vendor/jspdf.umd.min.js", "./vendor/jspdf.plugin.autotable.min.js",

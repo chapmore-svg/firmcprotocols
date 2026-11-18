@@ -2,7 +2,7 @@
    sharing, install and updates. The report itself (sections, findings, wording, PDF layout) is the
    original endoscopy app's code in app.js. */
 
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.1.1";
 const $id = id => document.getElementById(id);
 const UA = navigator.userAgent;
 const IS_ANDROID = /Android/i.test(UA);

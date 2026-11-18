@@ -1,5 +1,5 @@
 /* Endo Report Pro offline worker. Bump CACHE whenever any app file changes. */
-const CACHE = "endopro-1.1.0";
+const CACHE = "endopro-1.1.1";
 const FILES = [
   "./", "./index.html", "./styles.css", "./app.js", "./pro.js", "./manifest.webmanifest",
   "./vendor/jspdf.umd.min.js",
